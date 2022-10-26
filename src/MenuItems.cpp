@@ -57,7 +57,11 @@ void MenuItem::triggerCallback() const {
 }
 
 uint8_t MenuItem::copyNameToBuffer(char* buf, int offset, int size) const {
-	if (isMenuRuntime(this)) {
+    if (alternative_name_set) {
+        strncpy(buf + offset, alternative_name, size - offset);
+
+        return 30;
+    } else if (isMenuRuntime(this)) {
 		asRuntimeItem(this)->copyRuntimeName(buf + offset, size - offset);
 		return strlen(buf + offset) + offset;
 	}

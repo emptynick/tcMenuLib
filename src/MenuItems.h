@@ -327,6 +327,9 @@ typedef int(*RuntimeRenderingFn)(RuntimeMenuItem* item, uint8_t row, RenderFnMod
  * next available item. NULL represents the end of the chain.
  */
 class MenuItem {
+private:
+	char alternative_name[30];
+	bool alternative_name_set = false;
 protected:
 	uint16_t flags;
 	MenuItem* next;
@@ -337,6 +340,11 @@ protected:
 	};
 	MenuType menuType;
 public:
+
+	void setAlternativeName(char* name) {
+		memcpy(alternative_name, name, constrain(strlen(name), 0, 30));
+		alternative_name_set = true;
+	}
 
     /**
      * Copies the name into the provided buffer starting at position 0.

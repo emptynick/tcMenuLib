@@ -20,7 +20,7 @@ void MenuManager::initForUpDownOk(MenuRenderer* renderer, MenuItem* root, pinid_
 
 	switches.addSwitch(pinOk, nullptr);
     switches.onRelease(pinOk, [](pinid_t /*key*/, bool held) { menuMgr.onMenuSelect(held); });
-	setupUpDownButtonEncoder(pinUp, pinDown, [](int value) {menuMgr.valueChanged(value); }, speed);
+	setupUpDownButtonEncoder(pinUp, pinDown, [](int value) {menuMgr.valueChanged(value); });
 	renderer->initialise();
 }
 

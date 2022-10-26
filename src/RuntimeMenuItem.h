@@ -92,6 +92,8 @@ public:
     uint8_t getNumberOfRows() const { return noOfParts; }
     uint8_t getItemPosition() const { return itemPosition; }
 
+	uint8_t getCurrentPosition() const { return itemPosition; }
+
     void setNumberOfRows(uint8_t rows) {
 		noOfParts = rows;
 		setChanged(true); 
@@ -127,6 +129,10 @@ class SubMenuItem : public RuntimeMenuItem {
 private:
     MenuItem* child;
     const char* pgmNamePtr;
+
+    bool valueChanged = true;
+    char value[100] = "";
+    uint16_t textLength = 0;
 public:
     /**
      * Create an instance of SubMenuItem using the traditional SubMenuInfo block, this is no longer used, but we
@@ -164,6 +170,37 @@ public:
     void setChild(MenuItem* firstChildItem) { this->child = firstChildItem; }
 
     const char* getNamePGMUnsafe() const { return pgmNamePtr; }
+
+    void setValue(char* v) {
+        if (strcmp(value, v) != 0) {
+            strcpy(value, v);
+            valueChanged = true;
+        }
+    }
+
+    char* getValue() {
+        return value;
+    }
+
+    void setTextLength(uint16_t len) {
+        textLength = len;
+    }
+
+    uint16_t getTextLength() {
+        return textLength;
+    }
+
+    bool hasChanged() {
+        return valueChanged;
+    }
+
+    void unchange() {
+        valueChanged = false;
+    }
+
+    void doChange() {
+        valueChanged = true;
+    }
 };
 
 #define LIST_PARENT_ITEM_POS 0xff
