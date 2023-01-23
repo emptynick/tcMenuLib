@@ -1,5 +1,5 @@
 
-#include <AUnit.h>
+#include <testing/SimpleTest.h>
 #include <MockIoAbstraction.h>
 #include <BaseRenderers.h>
 #include <MockEepromAbstraction.h>
@@ -12,14 +12,53 @@ extern MockEepromAbstraction eeprom;
 
 const char szCompareData[] = "123456789";
 
-test(saveAndLoadFromMenu) {
+test(saveAndLoadFromMenuSized) {
+    switches.initialise(&mockIo, true);
+    setSizeBasedEEPROMStorageEnabled(true);
+    menuMgr.initForUpDownOk(&noRenderer, &textMenuItem1, 0, 1, 2);
+
+    eeprom.write16(0, 0xfade);
+    eeprom.write16(2, 8); // limit is location 8, shouldn't load past there.
+    eeprom.write16(4, 8);
+    eeprom.write16(6, 2);
+    eeprom.write8(8, 1);
+    eeprom.write16(20, 99);
+    eeprom.write16(34, 99);
+    menuMgr.load(eeprom);
+
+    // now check the values we've loaded back from eeprom.
+    assertEquals((int)menuAnalog2.getCurrentValue(), 8);
+    assertEquals((int)menuEnum1.getCurrentValue(), 2);
+    assertTrue(boolItem1.getBoolean());
+    // these items exceed position 8 in the rom and wont load
+    assertEquals((int)menuAnalog.getCurrentValue(), 0);
+    assertEquals((int)menuSubAnalog.getCurrentValue(), 0);
+    assertEquals((int)menuSubAnalog.getCurrentValue(), 0);
+
+    menuSubAnalog.setCurrentValue(42);
+
+    // save and then make sure the header is right
+    menuMgr.save(eeprom);
+    assertEquals(uint16_t(0xfade), eeprom.read16(0));
+    assertEquals(uint16_t(34), eeprom.read16(2));
+
+    // and now the values
+    assertEquals(eeprom.read16(20), (uint16_t)42);
+    assertEquals(eeprom.read16(4), (uint16_t)8);
+    assertEquals(eeprom.read16(6), (uint16_t)2);
+    assertEquals(eeprom.read8(8), (uint8_t)1);
+    switches.resetAllSwitches();
+}
+
+test(saveAndLoadFromMenuUnsized) {
     // initialise the menu manager and switches with basic configuration
     switches.initialise(&mockIo, true);
+    setSizeBasedEEPROMStorageEnabled(false);
     menuMgr.initForUpDownOk(&noRenderer, &textMenuItem1, 0, 1, 2);
 
     // now set up the eeprom ready to load.
     eeprom.write16(0, 0xfade);
-    eeprom.write16(2, 100);
+    eeprom.write16(34, 100);
     eeprom.write16(4, 8);
     eeprom.write16(6, 2);
     eeprom.write8(8, 1);
@@ -33,41 +72,42 @@ test(saveAndLoadFromMenu) {
 	menuMgr.load(eeprom);
 
     // now check the values we've loaded back from eeprom.
-    assertEqual((int)menuAnalog.getCurrentValue(), 100);
-    assertEqual((int)menuAnalog2.getCurrentValue(), 8);
-    assertEqual((int)menuSubAnalog.getCurrentValue(), 50);
-    assertEqual((int)menuEnum1.getCurrentValue(), 2);
-    assertEqual((int)boolItem1.getBoolean(), 1);
-	assertEqual(uint8_t(10), textMenuItem1.textLength());
-	assertEqual(szCompareData, textMenuItem1.getTextValue());
+    assertEquals((int)menuAnalog.getCurrentValue(), 100);
+    assertEquals((int)menuAnalog2.getCurrentValue(), 8);
+    assertEquals((int)menuSubAnalog.getCurrentValue(), 50);
+    assertEquals((int)menuEnum1.getCurrentValue(), 2);
+    assertEquals((int)boolItem1.getBoolean(), 1);
+	assertEquals(uint8_t(10), textMenuItem1.textLength());
+	assertEquals(szCompareData, textMenuItem1.getTextValue());
 	
 	char sz[20];
 	menuIpAddr.copyValue(sz, sizeof(sz));
-	assertEqual("192.168.90.88", sz);
+	assertEquals("192.168.90.88", sz);
 
     // clear out the eeprom and then save the present structure.
     eeprom.reset();
     menuMgr.save(eeprom);
 
     // now compare back from eeprom what we saved.
-    assertEqual(eeprom.read16(0), (uint16_t)0xfade);
-    assertEqual(eeprom.read16(2), (uint16_t)100);
-    assertEqual(eeprom.read16(20), (uint16_t)50);
-    assertEqual(eeprom.read16(4), (uint16_t)8);
-    assertEqual(eeprom.read16(6), (uint16_t)2);
-    assertEqual(eeprom.read8(8), (uint8_t)1);
+    assertEquals(eeprom.read16(0), (uint16_t)0xfade);
+    assertEquals(eeprom.read16(34), (uint16_t)100);
+    assertEquals(eeprom.read16(20), (uint16_t)50);
+    assertEquals(eeprom.read16(4), (uint16_t)8);
+    assertEquals(eeprom.read16(6), (uint16_t)2);
+    assertEquals(eeprom.read8(8), (uint8_t)1);
     
     eeprom.readIntoMemArray((uint8_t*)sz, 9, 10);
     sz[9]=0;
-    assertEqual(szCompareData, sz);
+    assertEquals(szCompareData, sz);
 
-	assertEqual(eeprom.read8(22), (uint8_t)192);
-	assertEqual(eeprom.read8(23), (uint8_t)168);
-	assertEqual(eeprom.read8(24), (uint8_t)90);
-	assertEqual(eeprom.read8(25), (uint8_t)88);
+	assertEquals(eeprom.read8(22), (uint8_t)192);
+	assertEquals(eeprom.read8(23), (uint8_t)168);
+	assertEquals(eeprom.read8(24), (uint8_t)90);
+	assertEquals(eeprom.read8(25), (uint8_t)88);
 
     // lastly make sure there were no errors in eeprom.
     assertFalse(eeprom.hasErrorOccurred());
+    switches.resetAllSwitches();
 }
 
 class TestMenuMgrObserver : public MenuManagerObserver {
@@ -120,6 +160,7 @@ const PROGMEM AnyMenuInfo testActionInfo2 = { "ActTest", 2394, 0xffff,  0, NO_CA
 ActionMenuItem testActionItem2(&testActionInfo2, nullptr);
 
 test(addingItemsAndMenuCallbacks) {
+    menuMgr.resetObservers();
     TestCapturingRenderer testRenderer(320, 200, true, "hello");
     menuMgr.setRootMenu(&textMenuItem1);
     menuMgr.initWithoutInput(&testRenderer, &textMenuItem1);
@@ -132,8 +173,8 @@ test(addingItemsAndMenuCallbacks) {
     menuMgr.addMenuAfter(&menuNumTwoDp, &testActionItem2);
     assertTrue(menuMgrObserver.didTriggerStructure());
 
-    assertEqual(&testActionItem2, menuNumTwoDp.getNext());
-    assertEqual(&testActionItem, testActionItem2.getNext());
+    assertEquals(&testActionItem2, menuNumTwoDp.getNext());
+    assertEquals(&testActionItem, testActionItem2.getNext());
     assertTrue(testActionItem.getNext() == nullptr);
 
     // put back as it was before.
@@ -172,7 +213,7 @@ test(addingItemsAndMenuCallbacks) {
     menuMgr.onMenuSelect(false); // stop editing
     assertTrue(menuMgrObserver.didTriggerEndEdit());
     assertTrue(menuMgrObserver.didOriginalCommitTrigger());
-    assertEqual((uint16_t)1, menuEnum1.getCurrentValue());
+    assertEquals((uint16_t)1, menuEnum1.getCurrentValue());
 
     // lastly try an enum item that does not go into editing because the callback returned false.
     menuMgrObserver.reset();

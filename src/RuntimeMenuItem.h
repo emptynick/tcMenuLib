@@ -5,7 +5,7 @@
 
 /**
  * @file RuntimeMenuItem.h
- * Contains definitions of menu items that can be fully defined at runtime with no need for prog mem structures.
+ * @brief Contains definitions of menu items that can be fully defined at runtime with no need for prog mem structures.
  */
 
 #ifndef _RUNTIME_MENUITEM_H_
@@ -111,6 +111,8 @@ public:
  * 		SubMenu.getChild() -> Back Menu Item -> Sub Menu Item 1 ...
  */
 class BackMenuItem : public RuntimeMenuItem {
+private:
+    const char* namePtr;
 public:
 	/**
 	 * Create an instance of the class
@@ -119,7 +121,22 @@ public:
 	 * @param renderFn the callback that provides the runtime information about the menu.
 	 */
 	BackMenuItem(RuntimeRenderingFn renderFn, MenuItem* next) 
-		: RuntimeMenuItem(MENUTYPE_BACK_VALUE, nextRandomId(), renderFn, 0, 1, next) { }
+		: RuntimeMenuItem(MENUTYPE_BACK_VALUE, nextRandomId(), renderFn, 0, 1, next), namePtr(nullptr) { }
+
+    /**
+     * Create an instance of the class using a SubMenuInfo block, it shares the info block
+     * with the Submenu itself to save space.
+     *
+     * @param info the info block, mainly used for the name
+     * @param next the next item in the linked list
+     * @param infoInPgm if the info block is const/PROGMEM: true, RAM: false
+     */
+    BackMenuItem(const SubMenuInfo* info, MenuItem* next, bool infoInPgm);
+
+    /**
+     * @return the name pointer or null if not set, could be in progmem.
+     */
+    const char* getNameUnsafe() const { return namePtr; }
 };
 
 /**
@@ -143,10 +160,11 @@ public:
      * @param child the first child item - (normally a BackMenuItem)
      * @param next the next menu in the chain if there is one, or NULL.
      */
-    SubMenuItem(const SubMenuInfo* info, MenuItem* child, MenuItem* next = nullptr)
+    SubMenuItem(const SubMenuInfo* info, MenuItem* child, MenuItem* next = nullptr, bool infoInPgm = INFO_LOCATION_PGM)
                 : RuntimeMenuItem(MENUTYPE_SUB_VALUE, get_info_uint(&info->id), backSubItemRenderFn, 0, 1, next) {
         this->child = child;
-        this->pgmNamePtr = info->name;
+        this->namePtr = info->name;
+        bitWrite(flags, MENUITEM_INFO_STRUCT_PGM, infoInPgm);
     }
 
     /**
@@ -160,7 +178,7 @@ public:
             : RuntimeMenuItem(MENUTYPE_SUB_VALUE, id, renderFn,
                               0, 1, next) {
         this->child = child;
-        this->pgmNamePtr = nullptr;
+        this->namePtr = nullptr;
     }
 
     /**
@@ -170,6 +188,7 @@ public:
     void setChild(MenuItem* firstChildItem) { this->child = firstChildItem; }
 
     const char* getNamePGMUnsafe() const { return pgmNamePtr; }
+    const char* getNameUnsafe() const { return namePtr; }
 
     void setValue(char* v) {
         if (strcmp(value, v) != 0) {
@@ -314,6 +333,15 @@ public:
      * @return true if able to set, otherwise false
      */
     bool setCharValue(uint8_t location, char val);
+
+    /**
+     * When working with keyboards this allows a value change in the form of a keypress to be decoded if possible
+     * by the text control. It triggers a RENDERFN_SET_TEXT_VALUE which is specific to text controls that need to
+     * be able to work with keyboard interfaces too.
+     * @param keyPress the key on the keyboard that was pressed
+     * @return true if successful otherwise false
+     */
+    bool valueChangedFromKeyboard(char keyPress);
 private:
 };
 
@@ -531,9 +559,14 @@ long parseIntUntilSeparator(const char* ptr, int& offset, size_t maxDigits=10);
 inline void invokeIfSafe(MenuCallbackFn cb, MenuItem* pItem) { if(cb && pItem) cb(pItem->getId()); }
 
 /**
- * This macro defines MenuItem*
- * a parent function for the type in question, the variable containing the progmem name and the call back method
- * or NULL if there's no callback.
+ * This macro defines the rendering function for all runtime menu items. It is used to override the name, function
+ * callback and eeprom address leaving the rest to go to the default function. You provide the following:
+ *
+ * 1. name of the function to create
+ * 2. the parent pass through function for the type
+ * 3. the name a string to go into const memory
+ * 4. the position in eeprom
+ * 5. an optional invoke method, or nullptr.
  */
 #define RENDERING_CALLBACK_NAME_INVOKE(fnName, parent, namepgm, eepromPosition, invoke) \
 const char fnName##Pgm[] PROGMEM = namepgm; \
@@ -549,6 +582,32 @@ int fnName(RuntimeMenuItem* item, uint8_t row, RenderFnMode mode, char* buffer, 
 		return eepromPosition; \
 	default: \
 		return parent(item, row, mode, buffer, buffSize); \
+	} \
+}
+
+/**
+ * This macro defines the rendering function for all runtime menu items. This version works differently to to INVOKE
+ * version, in that for RENDERFN_NAME it first calls the customFn and only if it returns false does it write the default
+ * name. For eeprom it always sends back what its configured with, everything else is passed through to your function.
+ *
+ * 1. name of the function to create
+ * 2. the custom function that you'll implement (that should call through to the default one).
+ * 3. the name a string to go into const memory
+ * 4. the position in eeprom
+ */
+#define RENDERING_CALLBACK_NAME_OVERRIDDEN(fnName, customFn, namepgm, eepromPosition) \
+const char fnName##Pgm[] PROGMEM = namepgm; \
+int fnName(RuntimeMenuItem* item, uint8_t row, RenderFnMode mode, char* buffer, int buffSize) { \
+	switch(mode) { \
+	case RENDERFN_NAME: \
+        if(customFn(item, row, mode, buffer, buffSize) == false) {  \
+            safeProgCpy(buffer, fnName##Pgm, buffSize); \
+        } \
+		return true; \
+	case RENDERFN_EEPROM_POS: \
+		return eepromPosition; \
+	default: \
+		return customFn(item, row, mode, buffer, buffSize); \
 	} \
 }
 

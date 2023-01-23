@@ -2,6 +2,7 @@
 // ESP32 S2 example based on Saola board
 // I2C on standard pin, 8 and 9 with an SH1106 display
 // encoder on 5, 6 with button on 7
+// Getting started: https://www.thecoderscorner.com/products/arduino-libraries/tc-menu/tcmenu-overview-quick-start/
 //
 
 #include "esp32s2Saola_menu.h"
@@ -12,7 +13,7 @@
 #include <tcMenuVersion.h>
 #include <WiFi.h>
 #include <stockIcons/wifiAndConnectionIcons16x12.h>
-
+#include <tcUtil.h>
 
 #define MENU_WIFIMODE_STATION 0
 const char pgmsListHeader[] PROGMEM = "List items";
@@ -44,19 +45,9 @@ void setup() {
     startWiFiAndListener();
     renderer.setFirstWidget(&wifiWidget);
 
-    // lastly when the title is pressed present a dialog.
+    // lastly we capture when the root title is pressed present a standard version dialog.
     setTitlePressedCallback([](int titleCb) {
-        auto dlg = renderer.getDialog();
-        if(!dlg->isInUse()) {
-            dlg->setButtons(BTNTYPE_NONE, BTNTYPE_CLOSE);
-            dlg->show(applicationInfo.name, false);
-            char sz[25];
-            char ver[10];
-            tccore::copyTcMenuVersion(ver, sizeof ver);
-            strcpy(sz, "TcMenu lib ");
-            strcat(sz, ver);
-            dlg->copyIntoBuffer(sz);
-        }
+        showVersionDialog(&applicationInfo);
     });
 }
 

@@ -41,7 +41,6 @@ void MenuEditingKeyListener::keyPressed(char key, bool held) {
             processMultiEditKeyPress(reinterpret_cast<TextMenuItem *>(editor), key);
         } else if (type == MENUTYPE_LARGENUM_VALUE) {
             processLargeNumberPress(reinterpret_cast<EditableLargeNumberMenuItem *>(editor), key);
-
         } else if (isMenuRuntimeMultiEdit(editor)) {
             processIntegerMultiEdit(reinterpret_cast<EditableMultiPartMenuItem*>(editor), key);
         }
@@ -65,8 +64,7 @@ void MenuEditingKeyListener::keyPressed(char key, bool held) {
             if (indexOfActive > numItems) return;
             MenuItem *newActive = getItemAtPosition(menuMgr.getCurrentMenu(), indexOfActive);
             if (newActive) {
-                currentActive->setActive(false);
-                newActive->setActive(true);
+                menuMgr.setItemActive(newActive);
                 serlogF2(SER_TCMENU_DEBUG, "activate item ", newActive->getId());
             }
         }
@@ -250,7 +248,7 @@ void MenuEditingKeyListener::processMultiEditKeyPress(TextMenuItem *item, char k
     if(key == enterKey) {
         clearState();
     } else {
-        item->valueChanged(findPositionInEditorSet(key));
+        if(!item->valueChangedFromKeyboard(key)) return;
         if (!item->nextPart()) {
             clearState();
             item->setEditing(false);

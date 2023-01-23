@@ -1,11 +1,10 @@
-/**
- * BETA early access, the frame buffer is not yet fully working. Only for evaluation.
- */
+// An example showing how to setup and use the BSP framebuffer support for STM32 devices on mbed. Tested and working
+// with STM32F4x9 DISC1
+//
+// Getting started: https://www.thecoderscorner.com/products/arduino-libraries/tc-menu/tcmenu-overview-quick-start/
 
 #include <mbed.h>
 #include "stm32f429FrameBuffer_menu.h"
-
-
 
 BufferedSerial console(USBTX, USBRX);
 MBedLogger LoggingPort(console);
@@ -17,6 +16,19 @@ void setup() {
     BSP_LCD_LayerDefaultInit(0, SDRAM_DEVICE_ADDR);
 
     setupMenu();
+
+    /**
+     * The function you provide is called when the touch calibration starts and ends. The parameter is false at start
+     * and true at the end. At the start you should remove any rotations so that the screen and touch are in alignment
+     * at their defaults. The UI will then present in the native format, and record the ranges, then once dismissed the
+     * function is called again, here you should reapply any required settings and if need be to a commit on the EEPROM.
+     */
+    touchCalibrator.initCalibration([](bool finished) {
+        serlogF2(SER_DEBUG, "Calibration FN done=", finished);
+        if(finished) {
+            reinterpret_cast<HalStm32EepromAbstraction*>(menuMgr.getEepromAbstraction())->commit();
+        }
+    }, true);
 
     taskManager.scheduleFixedRate(100, [] {
         menuACLine.setCurrentValue(2350 + (rand() % 100));

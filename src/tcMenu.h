@@ -20,8 +20,7 @@ class MenuRenderer;
 
 /**
  * @file tcMenu.h
- * 
- * The menu manager is responsible for managing a set of menu items, and is configured with a renderer and input
+ * @brief The menu manager is responsible for managing a set of menu items, and is configured with a renderer and input
  * capability in order to present the menu. Remotes generally also the the menu manager to find out about the
  * overall structure
  */
@@ -54,6 +53,13 @@ public:
      * @param item the item that has finished editing.
      */
     virtual void menuEditEnded(MenuItem* item)=0;
+
+    /**
+     * Optionally,this method can be overridden to be told when a new item has been activated. This callback will
+     * be called after the active item is changed.
+     * @param newActive
+     */
+    virtual void activeItemHasChanged(MenuItem* newActive) {}
 };
 
 /**
@@ -357,6 +363,13 @@ public:
 	 */
 	void setCurrentEditor(MenuItem* editor);
 
+    /**
+     * Set item to be the active item on the renderer. This also ensure any notifications are run too. It does
+     * clear any currently active item. This DOES NOT update the encoder, it is only to update the active status.
+     * @param item the item to active.
+     */
+    void setItemActive(MenuItem* item);
+
 	/**
 	 * Set the root item of either the first menu or any sub menu
 	 * @param theItem the item to become the current root of the menu.
@@ -364,13 +377,19 @@ public:
 	void changeMenu(MenuItem* possibleActive=nullptr);
 
 	/**
-	 * Navigate to the menu and ensure it is display, further, you can optionally provide an item in the menu to
-	 * activate, not doing so selects the first possible item.
-	 * @param theNewItem the root menu item to display
+	 * Make the menu item `theNewItem` the ROOT of the current menu on display, this item should be either the item referred
+	 * to by `rootMenuItem()` or the first child item of a submenu, normally obtained by calling `menuSub.getChild()` on the
+	 * submenu. When we navigate to a new item, by default menu manager keeps breadcrumbs to be able to go back nicely
+	 * afterwards. If you are navigiating to a dynamic menu that should not go into this history, set skipHistory to true.
+	 *
+	 * There is more information about this online see:
+	 * https://www.thecoderscorner.com/products/arduino-libraries/tc-menu/menumanager-and-iteration/#navigation-around-menus
+	 *
+	 * @param theNewItem the first child menu item of the submenu (or root item)
 	 * @param possibleActive the item to activate or null for default
-	 * @param customMenu set to true if this menu is custom and should not be stored in the history
+	 * @param skipHistory set to true if this menu is custom and should not be stored in the history
 	 */
-	void navigateToMenu(MenuItem* theNewItem, MenuItem* possibleActive = nullptr, bool customMenu = false);
+	void navigateToMenu(MenuItem* theNewItem, MenuItem* possibleActive = nullptr, bool skipHistory = false);
 
 	/**
 	 * Force a complete reset of the menu
@@ -378,19 +397,27 @@ public:
 	void resetMenu(bool completeReset);
 
 	/**
-	 * Get the first menu item in the linked list that is being rendered
+	 * @return the first menu item in the linked list that is being rendered
 	 */
 	MenuItem* getCurrentMenu() { return navigator.getCurrentRoot(); }
 
+    /**
+     * @return the submenu for the currently on display menu. If root is on display it will be nullptr.
+     */
 	MenuItem* getCurrentSubMenu() { return navigator.getCurrentSubMenu(); }
 
+    /**
+     * @return the underlying navigation store that manages navigation activity for this menu manager.
+     */
+    tcnav::MenuNavigationStore& getNavigationStore() { return navigator; }
+
 	/**
-	 * Get the parent of the current menu clearing all active flags too
+	 * @return the parent of the current menu clearing all active flags too
 	 */
 	MenuItem* getParentAndReset();
 
 	/**
-	 * returns the range of the encoder or other device that is providing the
+	 * @return the range of the encoder or other device that is providing the
 	 * equivalent function as the encoder.
 	 */
 	int getCurrentRangeValue() {
@@ -404,7 +431,12 @@ public:
 	 */
 	SecuredMenuPopup* secureMenuInstance();
 
-	void stopEditingCurrentItem(bool checkMultiPart);
+    /**
+     * Stop editing the current item, if doMultiPartNext is true and we are editing a multi part field , then this will
+     * instead move editing to the next part. Otherwise, editing will end.
+     * @param checkMultiPart true to move to the next on multipart instead of ending completely
+     */
+	void stopEditingCurrentItem(bool doMultiPartNext);
 
 	/**
 	 * Adds a menu item into the tree directly after the existing item provided. Never add an item that's already in
@@ -427,12 +459,34 @@ public:
      */
     void addChangeNotification(MenuManagerObserver* observer);
 
-    void majorOrderChangeApplied(int newMax);
+    /**
+     * This provides support for when lists are on the display, to allow the encoder to be updated so it can present
+     * the new items. If the list is not on display, nothing is done.
+     * @param runtimeItem
+     */
+    void recalculateListIfOnDisplay(RuntimeMenuItem* runtimeItem);
 
+    /**
+     * This sets rendering hints, so that the renderer knows that something is being edited. When the rendering hints
+     * are set, they refer to the item that is currently being edited.
+     * @param hint the type of edit taking place
+     * @param start the starting point within the text
+     * @param end the ending point within the text
+     */
     void setEditorHints(CurrentEditorRenderingHints::EditorRenderingType hint, size_t start=0, size_t end=0);
     const CurrentEditorRenderingHints& getEditorHints() { return renderingHints; }
 
+    /**
+     * Lock the editor hints such that nobody can change them, useful for complex editing where more than one field is
+     * being edited at once.
+     * @param locked true to lock, otherwise false.
+     */
     void setEditorHintsLocked(bool locked);
+
+    /**
+     * Use this with caution. Resets the entire list of observers that have previously been registered.
+     */
+    void resetObservers();
 
 protected:
 	void setupForEditing(MenuItem* item);

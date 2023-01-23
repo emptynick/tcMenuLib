@@ -4,12 +4,18 @@
  */
 
 #include "GraphicsDeviceRenderer.h"
+#include <tcUnicodeHelper.h>
 
 namespace tcgfx {
 
     const Coord rendererXbmArrowSize(8, 11);
     static unsigned char rendererUpArrowXbm[] = { 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f, 0x3f, 0x1f, 0x0f, 0x07, 0x03 };
     static unsigned char rendererDownArrowXbm[] = { 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xfc, 0xf8, 0xf0, 0xe0, 0xc0 };
+
+    inline bool isActiveOrEditing(MenuItem* pItem) {
+        auto mt = pItem->getMenuType();
+        return (pItem->isEditing() || pItem->isActive()) && mt != MENUTYPE_TITLE_ITEM && mt != MENUTYPE_BACK_VALUE;
+    }
 
     GraphicsDeviceRenderer::GraphicsDeviceRenderer(int bufferSize, const char *appTitle, DeviceDrawable *drawable)
             : BaseGraphicalRenderer(bufferSize, 1, 1, false, appTitle), rootDrawable(drawable), drawable(drawable) {
@@ -67,13 +73,25 @@ namespace tcgfx {
             return;
         }
 
+        DeviceDrawable* subDevice = nullptr;
+        if(rootDrawable->getSubDeviceType() == DeviceDrawable::SUB_DEVICE_4BPP) {
+            subDevice = rootDrawable->getSubDeviceFor(where, areaSize, entry->getDisplayProperties()->getPalette(), 6);
+        } else if(rootDrawable->getSubDeviceType() == DeviceDrawable::SUB_DEVICE_2BPP) {
+            color_t palette[4];
+            bool selected = isActiveOrEditing(entry->getMenuItem());
+            palette[ItemDisplayProperties::TEXT] = (selected) ? propertiesFactory.getSelectedColor(ItemDisplayProperties::TEXT) : entry->getDisplayProperties()->getPalette()[ItemDisplayProperties::TEXT];
+            palette[ItemDisplayProperties::BACKGROUND] = (selected) ? propertiesFactory.getSelectedColor(ItemDisplayProperties::BACKGROUND) : entry->getDisplayProperties()->getPalette()[ItemDisplayProperties::BACKGROUND];
+            palette[ItemDisplayProperties::HIGHLIGHT1] = entry->getDisplayProperties()->getPalette()[ItemDisplayProperties::HIGHLIGHT1];
+            palette[ItemDisplayProperties::HIGHLIGHT2] = entry->getDisplayProperties()->getPalette()[ItemDisplayProperties::HIGHLIGHT2];
+            subDevice = rootDrawable->getSubDeviceFor(where, areaSize, palette, 4);
+        }
 
-        auto* subDevice = rootDrawable->getSubDeviceFor(where, areaSize, entry->getDisplayProperties()->getPalette(), 6);
         if(subDevice) {
             subDevice->startDraw();
         }
         drawable = subDevice ? subDevice : rootDrawable;
         Coord wh = subDevice ? Coord(0,0) : where;
+
         switch(drawingMode) {
             case GridPosition::DRAW_TEXTUAL_ITEM:
             case GridPosition::DRAW_TITLE_ITEM:
@@ -93,11 +111,6 @@ namespace tcgfx {
             drawable = rootDrawable;
             subDevice->endDraw();
         }
-    }
-
-    inline bool isActiveOrEditing(MenuItem* pItem) {
-        auto mt = pItem->getMenuType();
-        return (pItem->isEditing() || pItem->isActive()) && mt != MENUTYPE_TITLE_ITEM && mt != MENUTYPE_BACK_VALUE;
     }
 
     int GraphicsDeviceRenderer::calculateSpaceBetween(const void* font, uint8_t mag, const char* buffer, int start, int end) {
@@ -128,8 +141,16 @@ namespace tcgfx {
             fg = props->getColor(ItemDisplayProperties::TEXT);
         }
 
+        copyMenuItemValue(pEntry->getMenuItem(), buffer, bufferSize);
         bool weAreEditingWithCursor = pEntry->getMenuItem()->isEditing() && menuMgr.getCurrentEditor() != nullptr
                                       && editorHintNeedsCursor(menuMgr.getEditorHints().getEditorRenderingType());
+
+        bool valueNeeded = true;
+        if(pEntry->getMenuItem()->getMenuType() == MENUTYPE_BOOLEAN_VALUE) {
+            if (reinterpret_cast<BooleanMenuItem *>(pEntry->getMenuItem())->getBooleanNaming() == NAMING_CHECKBOX) {
+                valueNeeded = false;
+            }
+        }
 
         if(just == GridPosition::JUSTIFY_TITLE_LEFT_VALUE_RIGHT || weAreEditingWithCursor) {
             // special case, title left, value right.
@@ -139,7 +160,9 @@ namespace tcgfx {
             drawable->setDrawColor(fg);
             drawable->drawText(wh, props->getFont(), props->getFontMagnification(), buffer);
 
-            copyMenuItemValue(pEntry->getMenuItem(), buffer, bufferSize);
+            if(valueNeeded) {
+                copyMenuItemValue(pEntry->getMenuItem(), buffer, bufferSize);
+            } else buffer[0] = 0;
             int16_t right = where.x + size.x - (drawable->textExtents(props->getFont(), props->getFontMagnification(), buffer).x + padding.right);
             wh.x = right;
             if(weAreEditingWithCursor) {
@@ -160,7 +183,6 @@ namespace tcgfx {
         else {
             char sz[32];
             bool nameNeeded = itemNeedsName(just);
-            bool valueNeeded = itemNeedsValue(just);
             if(valueNeeded && nameNeeded) {
                 copyMenuItemNameAndValue(pEntry->getMenuItem(), sz, sizeof sz, 0);
             } else if(valueNeeded) {
@@ -271,6 +293,29 @@ namespace tcgfx {
         }
     }
 
+    void GraphicsDeviceRenderer::drawCheckbox(GridPositionRowCacheEntry *entry, Coord& where, Coord& size) {
+        auto padding = entry->getDisplayProperties()->getPadding();
+        auto* icon = propertiesFactory.iconForMenuItem(entry->getMenuItem()->isEditing() ? SPECIAL_ID_EDIT_ICON :SPECIAL_ID_ACTIVE_ICON);
+
+        drawCoreLineItem(entry, icon, where, size, true);
+        auto hei = size.y - (padding.top + padding.top);
+        auto startingX = where.x + size.x - (padding.left + padding.right + hei);
+        auto boolItem = reinterpret_cast<BooleanMenuItem*>(entry->getMenuItem());
+        auto hl = entry->getDisplayProperties()->getColor(ItemDisplayProperties::HIGHLIGHT1);
+        auto txtCol = entry->getDisplayProperties()->getColor(ItemDisplayProperties::TEXT);
+
+        drawable->setDrawColor(txtCol);
+        drawable->drawBox(Coord(startingX, where.y + padding.top), Coord(hei, hei), false);
+        if(hl != txtCol) {
+            drawable->drawBox(Coord(startingX + 1, where.y + padding.top + 1), Coord(hei - 2, hei - 2), false);
+        }
+        if(boolItem->getBoolean()) {
+            drawable->setDrawColor(hl);
+            drawable->drawBox(Coord(startingX + 2, where.y + padding.top + 2), Coord(hei - 4, hei - 4), true);
+        }
+        internalDrawText(entry, where, Coord(size.x - (hei + padding.left), size.y));
+    }
+
     void GraphicsDeviceRenderer::drawUpDownItem(GridPositionRowCacheEntry *entry, Coord& where, Coord& size) {
         auto padding = entry->getDisplayProperties()->getPadding();
         auto* icon = propertiesFactory.iconForMenuItem(entry->getMenuItem()->isEditing() ? SPECIAL_ID_EDIT_ICON :SPECIAL_ID_ACTIVE_ICON);
@@ -301,6 +346,13 @@ namespace tcgfx {
     }
 
     void GraphicsDeviceRenderer::drawTextualItem(GridPositionRowCacheEntry* pEntry, Coord& where, Coord& size) {
+        if(pEntry->getMenuItem()->getMenuType() == MENUTYPE_BOOLEAN_VALUE) {
+            auto boolItem = reinterpret_cast<BooleanMenuItem*>(pEntry->getMenuItem());
+            if(boolItem->getBooleanNaming() == NAMING_CHECKBOX) {
+                drawCheckbox(pEntry, where, size);
+                return;
+            }
+        }
         auto* icon = propertiesFactory.iconForMenuItem(pEntry->getMenuItem()->isEditing() ? SPECIAL_ID_EDIT_ICON :SPECIAL_ID_ACTIVE_ICON);
         drawCoreLineItem(pEntry, icon, where, size, true);
         internalDrawText(pEntry, Coord(where.x, where.y), Coord(size.x, size.y));
@@ -387,4 +439,44 @@ namespace tcgfx {
         drawable->drawBox(Coord(0, endPoint), Coord(width, height-endPoint), true);
     }
 
+    void DeviceDrawable::drawText(const Coord& where, const void* font, int mag, const char* text) {
+        auto handler = getUnicodeHandler(false);
+        if(handler) {
+            handler->setDrawColor(drawColor);
+            setTcFontAccordingToMag(handler, font, mag);
+            handler->setCursor((int)where.x, (int)where.y + (handler->getYAdvance() - handler->getBaseline()));
+            handler->print(text);
+        } else {
+            internalDrawText(where, font, mag, text);
+        }
+    }
+
+    UnicodeFontHandler *DeviceDrawable::getUnicodeHandler(bool enableIfNeeded) {
+        if(fontHandler == nullptr && enableIfNeeded) {
+            fontHandler = createFontHandler();
+        }
+        return fontHandler; // if null, there is no font handler.
+    }
+
+    UnicodeFontHandler *DeviceDrawable::createFontHandler() {
+        return fontHandler = new UnicodeFontHandler(this, ENCMODE_UTF8);
+    }
+
+    Coord DeviceDrawable::textExtents(const void *font, int mag, const char *text, int *baseline) {
+        auto handler = getUnicodeHandler(false);
+        if(handler) {
+            setTcFontAccordingToMag(handler, font, mag);
+            return handler->textExtents(text, baseline, false);
+        } else {
+            return internalTextExtents(font, mag, text, baseline);
+        }
+    }
+
+    void setTcFontAccordingToMag(UnicodeFontHandler* handler, const void* font, int mag) {
+        if(mag == 0) {
+            handler->setFont((UnicodeFont*) font);
+        } else {
+            handler->setFont((GFXfont*) font);
+        }
+    }
 } // namespace tcgfx

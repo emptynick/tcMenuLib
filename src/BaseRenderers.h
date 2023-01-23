@@ -3,6 +3,11 @@
  * This product is licensed under an Apache license, see the LICENSE file in the top-level directory.
  */
 
+/**
+ * @file BaseRenderers.h
+ * @brief The base definitions and classes shared by all TcMenu renderers.
+ */
+
 #ifndef _BASE_RENDERERS_H_
 #define _BASE_RENDERERS_H_
 
@@ -93,6 +98,19 @@ public:
  * when the menu is not active, for example taking over the display until some condition is met.
  */
 typedef void (*ResetCallbackFn)();
+
+/**
+ * This class provides the reset callback in a functional way without the need for custom drawing class.
+ * It simply calls the provided reset function on reset.
+ */
+class ResetCallbackFunctionCustomDraw : public CustomDrawing {
+    ResetCallbackFn resetFn;
+public:
+    ResetCallbackFunctionCustomDraw(ResetCallbackFn fn): resetFn(fn) {}
+    void started(BaseMenuRenderer *currentRenderer) override { }
+    void reset() override {resetFn();}
+    void renderLoop(unsigned int currentValue, RenderPressMode userClick) override {}
+};
 
 /**
  * Title widgets allow for drawing small graphics in the title area, for example connectivity status
@@ -271,11 +289,7 @@ protected:
     uint16_t resetValInTicks;
 	MenuRedrawState redrawMode;
 	TitleWidget* firstWidget;
-	union {
-        ResetCallbackFn resetCallback;
-        CustomDrawing *customDrawing;
-    };
-    bool isCustomDrawing;
+    CustomDrawing *customDrawing;
 	DisplayTakeoverMode displayTakenMode;
     BaseDialog* dialog;
 
@@ -304,14 +318,7 @@ public:
 	 * re-initialises the reset interval to 30 seconds
 	 * @param updatesSec the number of updates.
 	 */
-	void setUpdatesPerSecond(int updatesSec) {
-        bool needsReschedule = updatesPerSecond == UPDATES_SEC_DISPLAY_OFF;
-	    updatesPerSecond = updatesSec;
-        resetValInTicks = 30 * updatesSec;
-        if(needsReschedule) {
-            taskManager.execute(this);
-        }
-    }
+	void setUpdatesPerSecond(int updatesSec);
 
     /**
      * Turn off the display updates to allow for low power state transition, to re-enable call setUpdatesPerSecond
@@ -327,7 +334,7 @@ public:
      * no present editor.
      * @param resetTime
      */
-    void setResetIntervalTimeSeconds(uint16_t interval) { 
+    void setResetIntervalTimeSeconds(uint16_t interval) {
         resetValInTicks = interval * updatesPerSecond;
     }
 
@@ -344,8 +351,7 @@ public:
      * and that will be notified of both reset events and take over display events.
      */
     void setResetCallback(ResetCallbackFn resetFn) {
-        isCustomDrawing = false;
-        resetCallback = resetFn;
+        customDrawing = new ResetCallbackFunctionCustomDraw(resetFn);
     }
 
     /**
@@ -355,8 +361,14 @@ public:
      * display is first taken over, followed by renderLoop until it's given back.
      */
     void setCustomDrawingHandler(CustomDrawing* customDrawingParam) {
-        isCustomDrawing= true;
         customDrawing = customDrawingParam;
+    }
+
+    /**
+     * @return the current custom drawing set on this renderer, it could be nullptr if never set.
+     */
+    CustomDrawing* getCurrentCustomDrawing() {
+        return customDrawing;
     }
 
     /**

@@ -13,18 +13,22 @@
 
 #include <Arduino.h>
 #include <tcMenu.h>
+#include <tcUnicodeHelper.h>
 #include "tcMenuTfteSpi.h"
 #include <graphics/MenuTouchScreenEncoder.h>
 #include <RuntimeMenuItem.h>
 #include <EditableLargeNumberMenuItem.h>
 #include <ScrollChoiceMenuItem.h>
 #include <IoAbstraction.h>
+#include <EepromItemStorage.h>
 
 // variables we declare that you may need to access
 extern const PROGMEM ConnectorLocalInfo applicationInfo;
 extern TFT_eSPI gfx;
 extern TfteSpiDrawable gfxDrawable;
 extern GraphicsDeviceRenderer renderer;
+extern const UnicodeFont OpenSansCyrillicLatin18[];
+extern const GFXfont RobotoMedium24;
 
 // Any externals needed by IO expanders, EEPROMs etc
 
@@ -32,6 +36,8 @@ extern GraphicsDeviceRenderer renderer;
 // Global Menu Item exports
 extern ListRuntimeMenuItem menuRootList;
 extern ActionMenuItem menuDialogs;
+extern TextMenuItem menuStatusInfo;
+extern AnyMenuInfo minfoStatusRestart;
 extern ActionMenuItem menuStatusRestart;
 extern FloatMenuItem menuStatusLineVoltage;
 extern BooleanMenuItem menuStatusAmpPower;
@@ -59,6 +65,7 @@ void setupMenu();
 #define CALLBACK_FUNCTION
 
 int fnRootListRtCall(RuntimeMenuItem* item, uint8_t row, RenderFnMode mode, char* buffer, int bufferSize);
+int infoRenderingRtCall(RuntimeMenuItem* item, uint8_t row, RenderFnMode mode, char* buffer, int bufferSize);
 void CALLBACK_FUNCTION onRestart(int id);
 void CALLBACK_FUNCTION onShowDialogs(int id);
 void CALLBACK_FUNCTION onVolumeChanged(int id);

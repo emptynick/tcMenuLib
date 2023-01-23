@@ -4,7 +4,8 @@
  */
 
 /**
- * @file TcMenuVersion.h contains the version information and accessor functions.
+ * @file TcMenuVersion.h
+ * @brief contains the version information and accessor functions.
  */
 
 #ifndef TCMENU_VERSION_H
@@ -15,8 +16,8 @@
 namespace tccore {
 
 // here we define the version as both a string and separate field
-#define TCMENU_MAJOR 2
-#define TCMENU_MINOR 5
+#define TCMENU_MAJOR 3
+#define TCMENU_MINOR 1
 #define TCMENU_PATCH 0
 
 /**
@@ -37,6 +38,7 @@ namespace tccore {
         appendChar(buffer, '.', bufferSize);
         fastltoa(buffer, TCMENU_PATCH, 3, NOT_PADDED, bufferSize);
     }
+
 
 }
 
