@@ -212,9 +212,9 @@ public:
      * copy the color data provided as the latest
      * @param other the new color data
      */
-    void setColorData(const RgbColor32& other) {
+    void setColorData(const RgbColor32& other, bool silent = false) {
         data = other;
-        changeOccurred(false);
+        changeOccurred(silent);
     }
 
     /**

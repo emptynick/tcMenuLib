@@ -346,8 +346,14 @@ protected:
 		RuntimeRenderingFn renderFn;
 	};
 	MenuType menuType;
+private:
+	char alternative_name[30];
+	bool alternative_name_set = false;
 public:
-
+	void setAlternativeName(char* name) {
+		memcpy(alternative_name, name, constrain(strlen(name), 0, 30));
+		alternative_name_set = true;
+	}
     /**
      * Copies the name into the provided buffer starting at position 0.
      * @param sz the buffer space
