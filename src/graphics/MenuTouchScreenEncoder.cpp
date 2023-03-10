@@ -13,7 +13,7 @@ namespace tcgfx {
 
 DialogMultiPartEditor dialogMultiPartEditor;
 
-MenuTouchScreenManager::MenuTouchScreenManager(TouchInterrogator* interrogator, BaseGraphicalRenderer* renderer, iotouch::TouchInterrogator::TouchRotation rotation)
+MenuTouchScreenManager::MenuTouchScreenManager(TouchInterrogator* interrogator, BaseGraphicalRenderer* renderer, const TouchOrientationSettings& rotation)
         : TouchScreenManager(interrogator, rotation),
           currentlySelected(nullptr), localStart(0,0), localSize(0,0), encoder(renderer), renderer(renderer),
           observer(&encoder), lastX(0.0F), lastY(0.0F), currentState(NOT_TOUCHED) {
@@ -32,23 +32,28 @@ void MenuTouchScreenManager::sendEvent(float locationX, float locationY, float t
         return;
     }
 
-    Coord raw = Coord((int)(float(renderer->getWidth()) * locationX), (int)(float(renderer->getHeight()) * locationY));
+    lastCoord = Coord((int)(float(renderer->getWidth()) * locationX), (int)(float(renderer->getHeight()) * locationY));
     if(touched == TOUCHED) {
-        currentlySelected = renderer->findMenuEntryAndDimensions(raw, localStart, localSize);
+        currentlySelected = renderer->findMenuEntryAndDimensions(lastCoord, localStart, localSize);
         setUsedForScrolling(currentlySelected == nullptr || currentlySelected->getPosition().getDrawingMode() == GridPosition::DRAW_INTEGER_AS_SCROLL);
     }
     if(currentlySelected) {
         // find the local size and ensure it does not drop below 0 in either dimension!
-        int locX = max(0, (int)(raw.x - localStart.x));
-        int locY = max(0, (int)(raw.y - localStart.y));
-        observer->touched(TouchNotification(currentlySelected, Coord(locX, locY), localStart, localSize, touched));
+        int locX = max(0, (int)(lastCoord.x - localStart.x));
+        int locY = max(0, (int)(lastCoord.y - localStart.y));
+        sendToObservers(TouchNotification(currentlySelected, Coord(locX, locY), localStart, localSize, touched));
     }
     else {
-        observer->touched(TouchNotification(raw, touched));
+        sendToObservers(TouchNotification(lastCoord, touched));
     }
 }
 
-bool isTouchActionable(MenuItem* pItem) {
+    void MenuTouchScreenManager::sendToObservers(TouchNotification notification) {
+        observer->touched(notification);
+        if(secondaryObserver) secondaryObserver->touched(notification);
+    }
+
+    bool isTouchActionable(MenuItem* pItem) {
     return isItemActionable(pItem) || pItem->getMenuType() == MENUTYPE_BACK_VALUE || pItem->getMenuType() == MENUTYPE_BOOLEAN_VALUE;
 }
 

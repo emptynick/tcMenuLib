@@ -9,7 +9,7 @@
       "defaultValue": "true",
       "item": {
         "naming": "ON_OFF",
-        "name": "Power",
+        "name": "Mains",
         "variableName": "Power",
         "id": 6,
         "eepromAddress": -1,
@@ -49,7 +49,7 @@
         "divisor": 1,
         "unitName": "W",
         "step": 1,
-        "name": "Consumption",
+        "name": "Power",
         "variableName": "Consumption",
         "id": 4,
         "eepromAddress": -1,
@@ -110,6 +110,53 @@
         "localOnly": false,
         "visible": true,
         "staticDataInRAM": false
+      }
+    },
+    {
+      "parentId": 5,
+      "type": "boolItem",
+      "defaultValue": "false",
+      "item": {
+        "naming": "CHECKBOX",
+        "name": "TS Calibration",
+        "variableName": "SettingsTSCalibration",
+        "id": 23,
+        "eepromAddress": -1,
+        "functionName": "onTouchCalibration",
+        "readOnly": false,
+        "localOnly": false,
+        "visible": true,
+        "staticDataInRAM": false
+      }
+    },
+    {
+      "parentId": 5,
+      "type": "actionMenu",
+      "item": {
+        "name": "Calibrate Now",
+        "variableName": "SettingsCalibrateNow",
+        "id": 24,
+        "eepromAddress": -1,
+        "functionName": "onCalibrateScreen",
+        "readOnly": false,
+        "localOnly": false,
+        "visible": true,
+        "staticDataInRAM": false
+      }
+    },
+    {
+      "parentId": 5,
+      "type": "actionMenu",
+      "item": {
+        "name": "Dashboard",
+        "variableName": "SettingsDashboard",
+        "id": 25,
+        "eepromAddress": -1,
+        "functionName": "onShowDash",
+        "readOnly": false,
+        "localOnly": false,
+        "visible": true,
+        "staticDataInRAM": true
       }
     },
     {
@@ -391,8 +438,28 @@
         "subsystem": "DISPLAY"
       },
       {
-        "name": "TOUCH_ROTATION",
-        "latestValue": "PORTRAIT",
+        "name": "ORIENTATION_SEPARATOR",
+        "latestValue": "",
+        "subsystem": "DISPLAY"
+      },
+      {
+        "name": "TFT_TOUCH_SWAP_XY",
+        "latestValue": "false",
+        "subsystem": "DISPLAY"
+      },
+      {
+        "name": "TFT_TOUCH_X_INVERTED",
+        "latestValue": "false",
+        "subsystem": "DISPLAY"
+      },
+      {
+        "name": "TFT_TOUCH_Y_INVERTED",
+        "latestValue": "false",
+        "subsystem": "DISPLAY"
+      },
+      {
+        "name": "CALIB_SEPARATOR",
+        "latestValue": "",
         "subsystem": "DISPLAY"
       },
       {

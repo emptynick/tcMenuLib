@@ -20,7 +20,8 @@ HalStm32EepromAbstraction glBspRom;
 StChromaArtDrawable Drawable;
 GraphicsDeviceRenderer renderer(30, applicationInfo.name, &Drawable);
 StBspTouchInterrogator touchInterrogator(240, 320);
-MenuTouchScreenManager touchScreen(&touchInterrogator, &renderer, iotouch::TouchInterrogator::PORTRAIT);
+iotouch::TouchOrientationSettings touchOrientation(false, false, false);
+MenuTouchScreenManager touchScreen(&touchInterrogator, &renderer, touchOrientation);
 tcextras::IoaTouchScreenCalibrator touchCalibrator(&touchScreen, &renderer, 400);
 
 // Global Menu Item declarations
@@ -63,18 +64,24 @@ BooleanMenuItem menuConnectivityEnableUSB(&minfoConnectivityEnableUSB, false, NU
 const SubMenuInfo minfoConnectivity = { "Connectivity", 9, 0xffff, 0, NO_CALLBACK };
 BackMenuItem menuBackConnectivity(&minfoConnectivity, &menuConnectivityEnableUSB, INFO_LOCATION_PGM);
 SubMenuItem menuConnectivity(&minfoConnectivity, &menuBackConnectivity, &menuSamples, INFO_LOCATION_PGM);
+AnyMenuInfo minfoSettingsDashboard = { "Dashboard", 25, 0xffff, 0, onShowDash };
+ActionMenuItem menuSettingsDashboard(&minfoSettingsDashboard, NULL, INFO_LOCATION_RAM);
+const AnyMenuInfo minfoSettingsCalibrateNow = { "Calibrate Now", 24, 0xffff, 0, onCalibrateScreen };
+ActionMenuItem menuSettingsCalibrateNow(&minfoSettingsCalibrateNow, &menuSettingsDashboard, INFO_LOCATION_PGM);
+const BooleanMenuInfo minfoSettingsTSCalibration = { "TS Calibration", 23, 0xffff, 1, onTouchCalibration, NAMING_CHECKBOX };
+BooleanMenuItem menuSettingsTSCalibration(&minfoSettingsTSCalibration, false, &menuSettingsCalibrateNow, INFO_LOCATION_PGM);
 RENDERING_CALLBACK_NAME_INVOKE(fnSettingsRunDurationRtCall, timeItemRenderFn, "Run duration", 4, NO_CALLBACK)
-TimeFormattedMenuItem menuSettingsRunDuration(fnSettingsRunDurationRtCall, TimeStorage(0, 0, 0, 0), 8, (MultiEditWireType)6, NULL);
+TimeFormattedMenuItem menuSettingsRunDuration(fnSettingsRunDurationRtCall, TimeStorage(0, 0, 0, 0), 8, (MultiEditWireType)6, &menuSettingsTSCalibration);
 const AnalogMenuInfo minfoSettingsTargetSpeed = { "Target speed", 7, 2, 200, onTargetChanged, 0, 100, "mS" };
 AnalogMenuItem menuSettingsTargetSpeed(&minfoSettingsTargetSpeed, 0, &menuSettingsRunDuration, INFO_LOCATION_PGM);
 const SubMenuInfo minfoSettings = { "Settings", 5, 0xffff, 0, NO_CALLBACK };
 BackMenuItem menuBackSettings(&minfoSettings, &menuSettingsTargetSpeed, INFO_LOCATION_PGM);
 SubMenuItem menuSettings(&minfoSettings, &menuBackSettings, &menuConnectivity, INFO_LOCATION_PGM);
-const AnalogMenuInfo minfoConsumption = { "Consumption", 4, 0xffff, 4000, NO_CALLBACK, 0, 1, "W" };
+const AnalogMenuInfo minfoConsumption = { "Power", 4, 0xffff, 4000, NO_CALLBACK, 0, 1, "W" };
 AnalogMenuItem menuConsumption(&minfoConsumption, 200, &menuSettings, INFO_LOCATION_PGM);
 const AnalogMenuInfo minfoACLine = { "AC Line", 3, 0xffff, 2600, NO_CALLBACK, 0, 10, "V" };
 AnalogMenuItem menuACLine(&minfoACLine, 2450, &menuConsumption, INFO_LOCATION_PGM);
-const BooleanMenuInfo minfoPower = { "Power", 6, 0xffff, 1, NO_CALLBACK, NAMING_ON_OFF };
+const BooleanMenuInfo minfoPower = { "Mains", 6, 0xffff, 1, NO_CALLBACK, NAMING_ON_OFF };
 BooleanMenuItem menuPower(&minfoPower, true, &menuACLine, INFO_LOCATION_PGM);
 
 void setupMenu() {

@@ -14,14 +14,45 @@
 
 MenuManager menuMgr;
 
-void MenuManager::initForUpDownOk(MenuRenderer* renderer, MenuItem* root, pinid_t pinDown, pinid_t pinUp, pinid_t pinOk, int speed) {
-	this->renderer = renderer;
-	navigator.setRootItem(root);
+class Digital4WayPassThruListener : public SwitchListener {
+private:
+    pinid_t backPin, nextPin;
+public:
+    void init(pinid_t back, pinid_t next) {
+        backPin = back;
+        nextPin = next;
+    }
 
-	switches.addSwitch(pinOk, nullptr);
+    void onPressed(pinid_t pin, bool held) override {
+        if(pin == backPin) {
+            if(!held) menuMgr.performDirectionMove(true);
+        } else if(pin == nextPin) {
+            if(!held) menuMgr.performDirectionMove(false);
+        }
+    }
+
+    void onReleased(pinid_t pin, bool held) override {}
+} fourWayPassThru;
+
+void MenuManager::initFor4WayJoystick(MenuRenderer* renderer, MenuItem* root, pinid_t downPin, pinid_t upPin, pinid_t leftPin,
+                         pinid_t rightPin, pinid_t okPin, int speed) {
+    this->renderer = renderer;
+    navigator.setRootItem(root);
+
+    switches.addSwitch(okPin, nullptr);
+    switches.onRelease(okPin, [](pinid_t /*key*/, bool held) { menuMgr.onMenuSelect(held); });
+    setupUpDownButtonEncoder(upPin, downPin, leftPin, rightPin, &fourWayPassThru, [](int val) {menuMgr.valueChanged(val);}, speed);
+    renderer->initialise();
+}
+
+void MenuManager::initForUpDownOk(MenuRenderer* renderer, MenuItem* root, pinid_t pinDown, pinid_t pinUp, pinid_t pinOk, int speed) {
+    this->renderer = renderer;
+    navigator.setRootItem(root);
+
+    switches.addSwitch(pinOk, nullptr);
     switches.onRelease(pinOk, [](pinid_t /*key*/, bool held) { menuMgr.onMenuSelect(held); });
-	setupUpDownButtonEncoder(pinUp, pinDown, [](int value) {menuMgr.valueChanged(value); }, speed);
-	renderer->initialise();
+    setupUpDownButtonEncoder(pinUp, pinDown, [](int value) {menuMgr.valueChanged(value); }, speed);
+    renderer->initialise();
 }
 
 void MenuManager::initForEncoder(MenuRenderer* renderer,  MenuItem* root, pinid_t encoderPinA, pinid_t encoderPinB, pinid_t encoderButton, EncoderType type) {
