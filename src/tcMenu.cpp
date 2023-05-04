@@ -33,7 +33,7 @@ public:
     }
 
     void onReleased(pinid_t pin, bool held) override {
-        if (rightIsSel) {
+        if (rightIsSel && pin == nextPin) {
             menuMgr.onMenuSelect(held);
         }
     }
@@ -49,11 +49,11 @@ void MenuManager::initFor4WayJoystick(MenuRenderer* renderer, MenuItem* root, pi
     navigator.setRootItem(root);
     fourWayPassThru.init(leftPin, rightPin);
 
-    if(okPin != -1) {
+    if(okPin == 0xffU) {
+        fourWayPassThru.setRightIsSelect(true);
+    } else {
         switches.addSwitch(okPin, nullptr);
         switches.onRelease(okPin, [](pinid_t /*key*/, bool held) { menuMgr.onMenuSelect(held); });
-    } else {
-        fourWayPassThru.setRightIsSelect(true);
     }
     setupUpDownButtonEncoder(upPin, downPin, leftPin, rightPin, &fourWayPassThru, [](int val) {menuMgr.valueChanged(val);}, speed);
     renderer->initialise();
@@ -303,6 +303,9 @@ bool MenuManager::activateMenuItem(MenuItem *item) {
     for(int i=0; i < count; i++) {
         auto* pItem = r->getMenuItemAtIndex(getCurrentMenu(), i);
         if(pItem != nullptr && pItem->getId() == item->getId()) {
+            if(switches.getEncoder()) {
+                switches.getEncoder()->setCurrentReading(i);
+            }
             valueChanged(i);
             return true;
         }
@@ -393,7 +396,7 @@ void MenuManager::changeMenu(MenuItem* possibleActive) {
     if (menuMgr.getCurrentMenu()->getMenuType() == MENUTYPE_RUNTIME_LIST) {
         auto* listMenu = reinterpret_cast<ListRuntimeMenuItem*>(menuMgr.getCurrentMenu());
         listMenu->setActiveIndex(0);
-        menuMgr.setItemsInCurrentMenu(listMenu->getNumberOfRows());
+        setItemsInCurrentMenu(listMenu->getNumberOfRows());
     } else {
         auto* toActivate = (possibleActive) ? possibleActive : navigator.getCurrentRoot();
         auto itemIdx = offsetOfItem(toActivate);

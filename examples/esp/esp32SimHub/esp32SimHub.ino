@@ -31,7 +31,7 @@
  */
 
 #include <Adafruit_ILI9341.h>
-#include "esp32SimHub_menu.h"
+#include "generated/esp32SimHub_menu.h"
 #include <Wire.h>
 #include <IoLogging.h>
 #include <AnalogDeviceAbstraction.h>
@@ -57,6 +57,9 @@ void setup() {
     // we start the serial bus at 115200 so it's ready for our connector to use
     Serial.begin(115200);
 
+    // before calling setup menu you can change the touch trigger mode (either below threshold or above) for my testing
+    // it was always below trigger, yours may differ.
+    esp32Touch.setTouchTriggerMode(TOUCH_TRIGGER_BELOW);
 
     // initialise the menu library, the following line was automatically added to setup by tcMenu.
     setupMenu();
@@ -215,4 +218,10 @@ void CALLBACK_FUNCTION onShowDialogs(int id) {
         dlg->showController(false, &dialogController);
         dlg->copyIntoBuffer("text 1");
     }
+}
+
+
+
+void CALLBACK_FUNCTION onEngineHasChanged(int id) {
+    // TODO - your menu change code
 }

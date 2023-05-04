@@ -435,13 +435,13 @@ namespace tcgfx {
 
     void GraphicsDeviceRenderer::fillWithBackgroundTo(int endPoint) {
         if(endPoint >= height) return; // nothing to do when the display is already full.
-        auto* bgConfig = propertiesFactory.configFor(menuMgr.getCurrentMenu(), ItemDisplayProperties::COMPTYPE_ITEM);
+        auto* bgConfig = propertiesFactory.configFor(nullptr, ItemDisplayProperties::COMPTYPE_ITEM);
         helper.getDrawable()->setDrawColor(bgConfig->getColor(ItemDisplayProperties::BACKGROUND));
         helper.getDrawable()->drawBox(Coord(0, endPoint), Coord(width, height-endPoint), true);
     }
 
     void GraphicsDeviceRenderer::subMenuRender(MenuItem* rootItem, uint8_t& locRedrawMode, bool& forceDrawWidgets) {
-        if(cardLayoutPane != nullptr && cardLayoutPane->isSubMenuCardLayout(rootItem)) {
+        if(cardLayoutPane != nullptr && cardLayoutPane->isSubMenuCardLayout(menuMgr.getCurrentSubMenu())) {
             GridPositionRowCacheEntry *titleEntry = itemOrderByRow.itemAtIndex(0);
             int activeIndex = offsetOfCurrentActive(rootItem);
             if(activeIndex == 0 && titleMode != NO_TITLE) activeIndex = 1; // do not allow 0 in this mode
@@ -477,9 +477,9 @@ namespace tcgfx {
         }
     }
 
-    void GraphicsDeviceRenderer::setCardLayoutStatusForRootItem(MenuItem* root, bool onOrOff) {
+    void GraphicsDeviceRenderer::setCardLayoutStatusForSubMenu(MenuItem* root, bool onOrOff) {
         if(cardLayoutPane != nullptr) {
-            cardLayoutPane->setEnablementForRootMenu(root, onOrOff);
+            cardLayoutPane->setEnablementForSub(root, onOrOff);
         } else {
             serlogF(SER_ERROR, "Card null");
         }
