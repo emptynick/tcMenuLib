@@ -28,6 +28,19 @@ struct ConnectorLocalInfo {
 };
 
 /**
+ * Provides the serial number for the board, it can be displayed and also used in remote JOIN messages to identify
+ * the board uniquiely by UUID and serial number.
+ *
+ * If you want to use the default implementation you can define flag TC_BOARD_SERIAL_NO to a long int value that will
+ * be stored as a constant in memory.
+ *
+ * If you want to have a custom implementation, define TC_MANUAL_SERIAL_NO_IMPL and then you must implement this method
+ * yourself instead. This function should not take undue time if implemented by you as it could block networking.
+ * @return the serial number
+ */
+uint32_t getBoardSerialNumber();
+
+/**
  * Show the TcMenu version in a dialog that can be dismissed
  * @param localInfo the local app information
  */
@@ -165,7 +178,7 @@ inline char* potentialProgramMemory(const char *x) {
 #define get_info_int(x) ((int16_t)pgm_read_word_near(x))
 #define get_info_uint(x) ((unsigned int)pgm_read_word_near(x))
 #define safeProgStrLen(x) (strlen_P(x))
-#else 
+#else
 #define TCMENU_DEFINED_PLATFORM PLATFORM_ARDUINO_32BIT
 #define PGM_TCM
 #define potentialProgramMemory(x) (x)
@@ -174,6 +187,15 @@ inline char* potentialProgramMemory(const char *x) {
 #define get_info_uint(x) ((unsigned int)(*x))
 #define get_info_callback(x) ((MenuCallbackFn)(*x))
 #define safeProgStrLen(x) (strlen(x))
+
+#if !defined(pgm_read_dword) && defined(__MBED__)
+# define pgm_read_byte(addr) (*(const unsigned char *)(addr))
+# define pgm_read_word(addr) (*(const unsigned short *)(addr))
+# define pgm_read_dword(addr) (*(const unsigned long *)(addr))
+# define pgm_read_float(addr) (*(const float *)(addr))
+# define pgm_read_ptr(addr) (*(addr))
+# define memcpy_P memcpy
+#endif // pgm_read_byte
 #endif
 
 #endif

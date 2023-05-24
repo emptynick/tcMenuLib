@@ -49,7 +49,7 @@ void MenuItem::clearSendRemoteNeededAll() {
 }
 
 void MenuItem::triggerCallback() const {
-	if (info == nullptr) {
+	if (info == nullptr || (getMenuType() == MENUTYPE_RUNTIME_LIST && get_info_callback(&info->callback) == nullptr)) {
 		return asRuntimeItem(this)->runCallback();
 	}
 
@@ -71,7 +71,7 @@ uint8_t MenuItem::copyNameToBuffer(char* buf, int offset, int size) const {
     // falling through to the code below
     if(menuType == MENUTYPE_RUNTIME_LIST && info != nullptr) {
         auto pList = reinterpret_cast<const ListRuntimeMenuItem*>(this);
-        if(pList->getActiveIndex() != LIST_PARENT_ITEM_POS) {
+        if(!pList->isActingAsParent()) {
             asRuntimeItem(this)->copyRuntimeName(buf + offset, size - offset);
             return strlen(buf + offset) + offset;
         }

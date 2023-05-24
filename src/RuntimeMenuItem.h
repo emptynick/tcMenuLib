@@ -90,7 +90,7 @@ public:
 	int getRuntimeId() const { return int(id); }
 	int getRuntimeEeprom() const { return renderFn((RuntimeMenuItem*)this, itemPosition, RENDERFN_EEPROM_POS, nullptr, 0); }
 	uint8_t getNumberOfParts() const { return noOfParts; }
-	void copyRuntimeName(char* buffer, int bufferSize) const { renderFn((RuntimeMenuItem*)this, itemPosition, RENDERFN_NAME, buffer, bufferSize); }
+	void copyRuntimeName(char* buffer, int bufferSize) const { renderFn((RuntimeMenuItem*)this, itemPosition, RENDERFN_NAME, buffer, bufferSize);}
 
     uint8_t getNumberOfRows() const { return noOfParts; }
     uint8_t getItemPosition() const { return itemPosition; }
@@ -224,9 +224,14 @@ public:
  * These are the only menu items that can presently be created dynamically at runtime.
  */
 class ListRuntimeMenuItem : public RuntimeMenuItem {
-private:
-	uint8_t activeItem;
 public:
+    enum ListMode: uint8_t { CUSTOM_RENDER, RAM_ARRAY, FLASH_ARRAY };
+private:
+    const char* const* dataArray;
+	uint8_t activeItem;
+    ListMode listMode = CUSTOM_RENDER;
+public:
+    ListRuntimeMenuItem(const AnyMenuInfo* info, int numberOfRows, const char* const* array, ListMode listMode, MenuItem* next = nullptr, bool isPgm = INFO_LOCATION_PGM);
     ListRuntimeMenuItem(const AnyMenuInfo* info, int numberOfRows, RuntimeRenderingFn renderFn, MenuItem* next = nullptr, bool isPgm = INFO_LOCATION_PGM);
     ListRuntimeMenuItem(menuid_t id, int numberOfRows, RuntimeRenderingFn renderFn, MenuItem* next = nullptr);
 
@@ -234,12 +239,14 @@ public:
 	RuntimeMenuItem* asParent();
 	RuntimeMenuItem* asBackMenu();
 
-	bool isActingAsParent() const { return itemPosition == LIST_PARENT_ITEM_POS; }
+    ListMode getListMode() const {return listMode;}
+    bool isActingAsParent() const { return itemPosition == LIST_PARENT_ITEM_POS; }
     uint8_t getActiveIndex() const { return activeItem; }
     void setActiveIndex(uint8_t idx) {
         activeItem = idx;
         setChanged(true);
     }
+    const char* const* getDataArray() { return dataArray; }
 };
 
 int defaultRtListCallback(RuntimeMenuItem* item, uint8_t row, RenderFnMode mode, char* buffer, int bufferSize);
