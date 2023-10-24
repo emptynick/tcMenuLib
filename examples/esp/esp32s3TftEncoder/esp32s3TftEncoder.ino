@@ -7,6 +7,8 @@
 #include "stockIcons/directionalIcons.h"
 #include "app_icondata.h"
 #include "tcMenuVersion.h"
+#include <IoLogging.h>
+#include <stockIcons/wifiAndConnectionIcons16x12.h>
 
 //
 // We use a card layout to present the items, here we demonstrate how to set it up and prepare custom menu items that
@@ -18,6 +20,8 @@
 DrawableIcon iconLeft(-1, Coord(11, 22), tcgfx::DrawableIcon::ICON_XBITMAP, ArrowHoriz11x22BitmapLeft, nullptr);
 DrawableIcon iconRight(-1, Coord(11, 22), tcgfx::DrawableIcon::ICON_XBITMAP, ArrowHoriz11x22BitmapRight, nullptr);
 
+TitleWidget titleWidget(iconsEthernetConnection, 2, 16, 12);
+
 void setupGridLayoutForCardView() {
     auto & factory = renderer.getGraphicsPropertiesFactory();
 
@@ -28,9 +32,9 @@ void setupGridLayoutForCardView() {
     const Coord iconBatSize(BATTERY_WIDTH, BATTERY_HEIGHT);
     factory.addImageToCache(DrawableIcon(menuBattery.getId(), iconBatSize, DrawableIcon::ICON_XBITMAP, batteryIcon40Bits));
 
-    factory.addGridPosition(&menuSettings, GridPosition(GridPosition::DRAW_AS_ICON_TEXT, GridPosition::JUSTIFY_CENTER_NO_VALUE, 1, 60));
-    factory.addGridPosition(&menuMute, GridPosition(GridPosition::DRAW_AS_ICON_TEXT, GridPosition::JUSTIFY_CENTER_NO_VALUE, 2, 60));
-    factory.addGridPosition(&menuBattery, GridPosition(GridPosition::DRAW_AS_ICON_TEXT, GridPosition::JUSTIFY_CENTER_NO_VALUE, 3, 60));
+    factory.addGridPosition(&menuSettings, GridPosition(GridPosition::DRAW_AS_ICON_TEXT, GridPosition::JUSTIFY_CENTER_NO_VALUE, 0, 60));
+    factory.addGridPosition(&menuMute, GridPosition(GridPosition::DRAW_AS_ICON_TEXT, GridPosition::JUSTIFY_CENTER_NO_VALUE, 1, 60));
+    factory.addGridPosition(&menuBattery, GridPosition(GridPosition::DRAW_AS_ICON_TEXT, GridPosition::JUSTIFY_CENTER_NO_VALUE, 2, 60));
 
     // after adding things to the drawing properties, we must refresh it.
     tcgfx::ConfigurableItemDisplayPropertiesFactory::refreshCache();
@@ -41,12 +45,13 @@ void setupGridLayoutForCardView() {
 void setup() {
     Serial.begin(115200);
 
+    serEnableLevel(SER_TCMENU_DEBUG, true);
+    renderer.setFirstWidget(&titleWidget);
     setupMenu();
 
     // Here we enable the card layout mode for the main menu by first enabling support, then adding the root menu.
     // We also set up the item layout for card view by calling our setup function, defined above.
     renderer.enableCardLayout(iconLeft, iconRight, nullptr, false);
-    renderer.setCardLayoutStatusForSubMenu(&rootMenuItem(), true);
     setupGridLayoutForCardView();
 
     // We can set a callback for when the title item is pressed on the main menu, here we show the app version
@@ -55,10 +60,14 @@ void setup() {
     });
 
     // every second we simulate updating the battery condition indicators.
-    taskManager.scheduleFixedRate(1, [] {
+    taskManager.schedule(repeatSeconds(1), [] {
         menuBatteryCharge.setCurrentValue(rand() % 100);
         menuBatteryCondition.setCurrentValue(rand() % 3);
-    }, TIME_SECONDS);
+    });
+
+    taskManager.schedule(repeatSeconds(30), [] {
+        titleWidget.setCurrentState(rand() % 2);
+    });
 }
 
 void loop() {

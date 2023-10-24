@@ -62,7 +62,8 @@ void MenuEditingKeyListener::keyPressed(char key, bool held) {
             uint16_t indexOfActive = offsetOfCurrentActive(currentActive) + dir;
             uint8_t numItems = itemCount(menuMgr.getCurrentMenu(), false);
             if (indexOfActive >= numItems) return;
-            MenuItem *newActive = getItemAtPosition(menuMgr.getCurrentMenu(), indexOfActive);
+            auto renderer = BaseMenuRenderer::getInstance();
+            MenuItem *newActive = renderer->getMenuItemAtIndex(menuMgr.getCurrentMenu(), indexOfActive);
             if (newActive) {
                 menuMgr.setItemActive(newActive);
                 serlogF2(SER_TCMENU_DEBUG, "activate item ", newActive->getId());
@@ -72,7 +73,9 @@ void MenuEditingKeyListener::keyPressed(char key, bool held) {
         clearState();
         menuMgr.resetMenu(held);
     } else if (key == enterKey) {
-        clearState();
+        if(menuMgr.getCurrentEditor() && menuMgr.getCurrentEditor()->getMenuType() != MENUTYPE_RUNTIME_LIST) {
+            clearState();
+        }
         menuMgr.onMenuSelect(held);
         if(menuMgr.getCurrentEditor() && menuMgr.getCurrentEditor()->getMenuType() == MENUTYPE_INT_VALUE) {
             processAnalogKeyPress(reinterpret_cast<AnalogMenuItem*>(menuMgr.getCurrentEditor()), key);
@@ -195,7 +198,6 @@ void MenuEditingKeyListener::processAnalogKeyPress(AnalogMenuItem *item, char ke
                 if (frac > item->getDivisor()) {
                     // the number entered is too big, exit.
                     serlogF2(SER_TCMENU_INFO, "Number too large ", frac);
-                    item->setEditing(false);
                     clearState();
                     return;
                 }
@@ -235,7 +237,6 @@ void MenuEditingKeyListener::processLargeNumberPress(EditableLargeNumberMenuItem
         item->valueChanged(key - '0');
         if (!item->nextPart()) {
             clearState();
-            item->setEditing(false);
         }
     }
     else if(key == enterKey) {
@@ -251,7 +252,6 @@ void MenuEditingKeyListener::processMultiEditKeyPress(TextMenuItem *item, char k
         if(!item->valueChangedFromKeyboard(key)) return;
         if (!item->nextPart()) {
             clearState();
-            item->setEditing(false);
         }
     }
 }

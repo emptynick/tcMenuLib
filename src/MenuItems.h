@@ -196,16 +196,14 @@ struct FloatMenuInfo {
  * Each menu item can be in the following states.
  */
 enum Flags : uint8_t {
-    /** the menu is currently active but not editing */
-	MENUITEM_ACTIVE = 0,
-    /** the menu has changed and needs drawing by the renderer */
-	MENUITEM_CHANGED = 1,
+    /** the menu has changed and needs drawing by the renderer 0 */
+	MENUITEM_CHANGED = 0,
+    /** the menu has changed and needs drawing by the renderer 1 */
+	MENUITEM_CHANGED_1 = 1,
     /** the menu cannot be changed by the renderer or remote, it can be changed by calling the setter. */
-	MENUITEM_READONLY = 2,
+	MENUITEM_READONLY = 3,
     /** the menu must not be sent remotely, and is only available via the local renderer */
-	MENUITEM_LOCAL_ONLY = 3,
-    /** the menu is currently being edited */
-	MENUITEM_EDITING = 4,
+	MENUITEM_LOCAL_ONLY = 4,
     /** the menu item is secured, and must be accessed with a pin */
     MENUITEM_PIN_SECURED = 5,
     /** the menu item is visible on the display and remote */
@@ -228,6 +226,7 @@ enum Flags : uint8_t {
 };
 
 #define MENUITEM_ALL_REMOTES 0xFC00
+#define MENUITEM_ALL_CHANGE 0x0003
 
 /**
  * As we don't have RTTI we need a way of identifying each menu item. Any value below 100 is based
@@ -371,10 +370,13 @@ public:
 
     bool isInfoProgMem() const { return bitRead(flags, MENUITEM_INFO_STRUCT_PGM); }
 
-	/** set the item to be changed, this lets the renderer know it needs painting */
-	void setChanged(bool changed) { bitWrite(flags, MENUITEM_CHANGED, changed); }
+	/** set the item to be changed to all renderers, and when changed is true all remotes as well. When clearing
+	 * changed flag prefer to use the numbered version below. */
+	void setChanged(bool changed);
+	/** set the item to be changed, this lets a renderer know it needs painting */
+	void setChanged(int num, bool changed) { bitWrite(flags, (num & 3), changed); }
 	/** returns the changed state of the item */
-	bool isChanged() const { return bitRead(flags, MENUITEM_CHANGED); }
+	bool isChanged(int num = 0) const { return bitRead(flags, (num & 3)); }
 	/** returns if the menu item needs to be sent remotely */
 	bool isSendRemoteNeeded(uint8_t remoteNo) const;
 	/** Set all the flags indicating that a remote refresh is needed for all remotes */
@@ -383,16 +385,6 @@ public:
     void clearSendRemoteNeededAll();
 	/** set the flag indicating that a remote refresh is needed for a specific remote */
 	void setSendRemoteNeeded(uint8_t remoteNo, bool needed);
-
-	/** sets this to be the active item, so that the renderer shows it highlighted */
-	void setActive(bool active);
-	/** returns the active status of the item */
-	bool isActive() const { return bitRead(flags, MENUITEM_ACTIVE); }
-
-	/** sets this item as the currently being edited, so that the renderer shows it as being edited */
-	void setEditing(bool active);
-	/** returns true if the status is currently being edited */
-	bool isEditing() const { return bitRead(flags, MENUITEM_EDITING); }
 
 	/** sets this item to be read only, so that the manager will not allow it to be edited */
 	void setReadOnly(bool active) { bitWrite(flags, MENUITEM_READONLY, active); }
@@ -704,7 +696,7 @@ class RuntimeMenuItem;
  * @param buffer the buffer for the copy
  * @param bufferSize size of the buffer
  */
-void copyMenuItemValue(const MenuItem* item, char* buffer, size_t bufferSize);
+void copyMenuItemValue(const MenuItem* item, char* buffer, size_t bufferSize, bool active = false);
 
 /**
  * Copies both the name and textual value representation suitable for display on a device into the buffer safely.
@@ -713,13 +705,13 @@ void copyMenuItemValue(const MenuItem* item, char* buffer, size_t bufferSize);
  * @param bufferSize the size of the buffer
  * @param additionalSep optional provide the separator character (use '\0' for no additional separator)
  */
-void copyMenuItemNameAndValue(const MenuItem* item, char* buffer, size_t bufferSize, char additionalSep = ':');
+void copyMenuItemNameAndValue(const MenuItem* item, char* buffer, size_t bufferSize, char additionalSep = ':', bool active = false);
 
 /**
  * Copies the item value into the buffer provided using the above `copyMenuItemValue` method, if the resulting string
  * is empty, then the default is provided instead.
  */
-void copyMenuItemValueDefault(const MenuItem* item, char* buffer, size_t bufferSize, const char* defValue);
+void copyMenuItemValueDefault(const MenuItem* item, char* buffer, size_t bufferSize, const char* defValue, bool active = false);
 
 /**
  * Any MenuType with an ID less than 100 is editable as an integer

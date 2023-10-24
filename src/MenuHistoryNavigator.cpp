@@ -7,13 +7,15 @@
 #include "MenuHistoryNavigator.h"
 #include "MenuIterator.h"
 #include "RuntimeMenuItem.h"
+#include "tcMenu.h"
 
 void tcnav::MenuNavigationStore::setRootItem(MenuItem *item) {
     root = item;
     currentRoot = root;
-    currentSub = nullptr;
+    currentSub = &MenuManager::ROOT;
     navIdx = 0;
     currentIsCustom = false;
+    triggerNavigationListener(false);
 }
 
 void tcnav::MenuNavigationStore::navigateTo(MenuItem *activeItem, MenuItem *newRoot, bool custom) {
@@ -30,20 +32,23 @@ void tcnav::MenuNavigationStore::navigateTo(MenuItem *activeItem, MenuItem *newR
     }
     currentRoot = newRoot;
     currentSub = getSubMenuFor(newRoot);
+    triggerNavigationListener(false);
 }
 
 MenuItem *tcnav::MenuNavigationStore::popNavigationGetActive() {
     currentIsCustom = false;
     if(navIdx == 0) {
         serlogF(SER_TCMENU_INFO, "Nav pop root");
-        currentSub = nullptr;
+        currentSub = &MenuManager::ROOT;
         currentRoot = root;
+        triggerNavigationListener(false);
         return root;
     } else {
         navIdx--;
         currentRoot = navItems[navIdx];
         currentSub = getSubMenuFor(currentRoot);
         serlogF3(SER_TCMENU_INFO, "Nav pop ", navIdx, currentRoot->getId());
+        triggerNavigationListener(false);
         return activeItems[navIdx];
     }
 }
@@ -54,4 +59,23 @@ bool tcnav::MenuNavigationStore::isShowingRoot() {
 
 void tcnav::MenuNavigationStore::resetStack() {
     setRootItem(root);
+    triggerNavigationListener(true);
+}
+
+void tcnav::MenuNavigationStore::addNavigationListener(tcnav::NavigationListener *newListener) {
+    if(this->navigationLister == nullptr) {
+        this->navigationLister = newListener;
+    } else {
+        newListener->setNext(navigationLister);
+        navigationLister = newListener;
+    }
+    newListener->navigationHasChanged(currentRoot, false);
+}
+
+void tcnav::MenuNavigationStore::triggerNavigationListener(bool completeReset) {
+    auto current = navigationLister;
+    while(current) {
+        current->navigationHasChanged(currentRoot, completeReset);
+        current = navigationLister->getNext();
+    }
 }
