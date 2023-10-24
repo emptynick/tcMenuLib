@@ -213,16 +213,12 @@ private:
     color_t getFgColor(MenuItem *item, bool updated) override;
 };
 
-// forward reference
-class DrawableDashboard;
-
 /**
  * Each item that is to appear in the dashboard can be attached to a menu item, this is the drawing class that will
  * present a given item in the dashboard.
  */
 class DashMenuItem {
 private:
-    DrawableDashboard* dashboard;
     MenuItem *item;
     Coord screenLoc;
     DashDrawParameters *parameters;
@@ -234,9 +230,9 @@ private:
     int baseline;
     char titleText[20];
 public:
-    DashMenuItem() : dashboard(nullptr), item(nullptr), screenLoc(0, 0), parameters(nullptr), updateCountDown(0), titleExtents(0, 0),
+    DashMenuItem() : item(nullptr), screenLoc(0, 0), parameters(nullptr), updateCountDown(0), titleExtents(0, 0),
                      numChars(0), valueWidth(0), countDownTicks(0), baseline(0), titleText() {}
-    DashMenuItem(DrawableDashboard* dashboard, MenuItem *theItem, Coord topLeft, DashDrawParameters* params, int numCharsInValue, const char* titleOverride, int countDownTicks);
+    DashMenuItem(MenuItem *theItem, Coord topLeft, DashDrawParameters* params, int numCharsInValue, const char* titleOverride, int countDownTicks);
     DashMenuItem(const DashMenuItem &other) = default;
     DashMenuItem& operator= (const DashMenuItem& other) = default;
 
@@ -301,7 +297,7 @@ public:
 private:
     DrawableDashboardDelegate *delegate = nullptr;
     TitleWidget* firstWidget;
-    BaseGraphicalRenderer *renderer;
+    BaseMenuRenderer *renderer;
     DeviceDrawable *drawable;
     BtreeList<uint16_t, DashMenuItem> drawingItems;
     color_t screenBg = 0;
@@ -309,7 +305,7 @@ private:
     DashboardMode drawingMode;
     bool running;
 public:
-    DrawableDashboard(DeviceDrawable *device, BaseGraphicalRenderer* renderer, TitleWidget* widgets, DashboardMode drawingMode)
+    DrawableDashboard(DeviceDrawable *device, BaseMenuRenderer* renderer, TitleWidget* widgets, DashboardMode drawingMode)
             : firstWidget(widgets), renderer(renderer), drawable(device), drawingItems(), drawingMode(drawingMode), running(false) { }
     ~DrawableDashboard() override = default;
     void setBaseColors(color_t screenBgCol, color_t coreFgCol) {
@@ -334,8 +330,6 @@ public:
     void renderLoop(unsigned int currentValue, RenderPressMode userClick) override;
 
     void drawWidgets(bool force);
-
-    uint8_t getDisplayNumber() { return renderer->getDisplayNumber(); }
 };
 
 #endif //TCMENU_DRAWABLE_DASHBOARD_H

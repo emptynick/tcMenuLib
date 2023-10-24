@@ -9,9 +9,9 @@
 
 namespace tcgfx {
 
+
 void BaseGraphicalRenderer::render() {
-    // do not attempt rendering before everything is initialised.
-    if(currentRootMenu == nullptr) return;
+    checkIfRootHasChanged();
 
     uint8_t locRedrawMode = redrawMode;
     redrawMode = MENUDRAW_NO_CHANGE;
@@ -32,7 +32,7 @@ void BaseGraphicalRenderer::render() {
     MenuItem* rootItem = menuMgr.getCurrentMenu();
 
     if (menuMgr.getCurrentMenu()->getMenuType() == MENUTYPE_RUNTIME_LIST ) {
-        if (rootItem->isChanged(displayNumber) || locRedrawMode != MENUDRAW_NO_CHANGE) {
+        if (rootItem->isChanged() || locRedrawMode != MENUDRAW_NO_CHANGE) {
             renderList();
             forceDrawWidgets = true;
         }
@@ -45,66 +45,44 @@ void BaseGraphicalRenderer::render() {
     drawingCommand(DRAW_COMMAND_ENDED);
 }
 
-uint8_t BaseGraphicalRenderer::setActiveItem(MenuItem *item) {
-    auto ret = BaseMenuRenderer::setActiveItem(item);
-
-    // if we're drawing a list, clear out the drawing location, lists handled differently
-    if(menuMgr.getCurrentMenu()->getMenuType() == MENUTYPE_RUNTIME_LIST) {
-        drawingLocation = CachedDrawingLocation();
-        return 0;
-    }
-
-    auto rootItem = menuMgr.getCurrentMenu();
+void BaseGraphicalRenderer::subMenuRender(MenuItem* rootItem, uint8_t& locRedrawMode, bool& forceDrawWidgets) {
+    // first we find the first currently active rootItem in our single linked list
     int activeIndex = findActiveItem(rootItem);
     uint16_t totalHeight = calculateHeightTo(activeIndex, rootItem);
     int startRow = 0;
     uint16_t adjustedHeight = height + (isLastRowExactFit() ? 0 : 1);
+    bool drawCompleteScreen = locRedrawMode != MENUDRAW_NO_CHANGE;
+    int16_t startY = 0;
 
-    auto startY = 0;
     if(titleMode == TITLE_ALWAYS) {
         startRow++;
         startY = heightOfRow(0, true);
         adjustedHeight -= startY;
         totalHeight -= startY;
     }
-    serlogF4(SER_TCMENU_DEBUG, "totH, actIdx, adjH ", totalHeight, activeIndex, adjustedHeight);
 
     while (totalHeight > adjustedHeight) {
         totalHeight -= heightOfRow(startRow, true);
         startRow++;
     }
-    serlogF4(SER_TCMENU_DEBUG, "sy, sr, adj ", startY, startRow, adjustedHeight);
 
     // the screen has moved, we must completely redraw the area, and we need a clear first.
-    if(drawingLocation.getCurrentOffset() != startRow) {
-        redrawMode = MENUDRAW_COMPLETE_REDRAW;
-        serlogF2(SER_TCMENU_DEBUG, "Screen Row moved ", startRow);
+    if(locRedrawMode != MENUDRAW_COMPLETE_REDRAW && lastOffset != startRow) {
+        locRedrawMode = MENUDRAW_COMPLETE_REDRAW;
+        serlogF3(SER_TCMENU_DEBUG, "Screen Row moved ", lastOffset, startRow);
+        drawCompleteScreen = true;
     }
-    drawingLocation = CachedDrawingLocation(startY, startRow);
+    lastOffset = startRow;
 
-    return ret;
-}
-
-void BaseGraphicalRenderer::subMenuRender(MenuItem* rootItem, uint8_t& locRedrawMode, bool& forceDrawWidgets) {
-    bool drawCompleteScreen = locRedrawMode != MENUDRAW_NO_CHANGE;
-    auto startRow = drawingLocation.getCurrentOffset();
-
-    // the screen has moved, we must completely redraw the area, and we need a clear first.
-    drawCompleteScreen = (locRedrawMode == MENUDRAW_COMPLETE_REDRAW);
-
-    if(titleMode == TITLE_ALWAYS && (drawCompleteScreen  || itemOrderByRow.itemAtIndex(0)->getMenuItem()->isChanged(displayNumber))) {
+    if(titleMode == TITLE_ALWAYS && (drawCompleteScreen  || itemOrderByRow.itemAtIndex(0)->getMenuItem()->isChanged())) {
         auto* pEntry = itemOrderByRow.itemAtIndex(0);
-        drawMenuItem(pEntry, Coord(0,0), Coord(int(width), drawingLocation.getStartY()), DrawingFlags(drawCompleteScreen, activeItem == pEntry->getMenuItem(), menuMgr.getCurrentEditor() == pEntry->getMenuItem()));
+        drawMenuItem(pEntry, Coord(0,0), Coord(int(width), startY), drawCompleteScreen);
         forceDrawWidgets = true;
-        setTitleOnDisplay(true);
-    } else if(itemOrderByRow.count() > 0){
-        bool drawingTitle = itemOrderByRow.itemAtIndex(0)->getPosition().getDrawingMode() == GridPosition::DRAW_TITLE_ITEM;
-        setTitleOnDisplay(drawingTitle && startRow == 0);
     }
 
     // and then we start drawing items until we run out of screen or items
-    if(drawTheMenuItems(startRow, drawingLocation.getStartY(), drawCompleteScreen)) forceDrawWidgets = true;
-
+    if(drawTheMenuItems(startRow, startY, drawCompleteScreen)) forceDrawWidgets = true;
+    setTitleOnDisplay((titleMode == TITLE_FIRST_ROW && startRow == 0) || titleMode == TITLE_ALWAYS);
 }
 
 GridPositionRowCacheEntry* BaseGraphicalRenderer::findMenuEntryAndDimensions(const Coord& screenPos, Coord& localStart, Coord& localSize) {
@@ -202,18 +180,17 @@ bool BaseGraphicalRenderer::drawTheMenuItems(int startRow, int startY, bool draw
             auto extentsY = isLastRowExactFit() ? totalHeight : ypos;
             if(extentsY > height) break;
 
-            if (drawEveryLine || item->isChanged(displayNumber)) {
-                serlogF4(SER_TCMENU_DEBUG, "draw item (pos,id,chg)", i, item->getId(), item->isChanged(displayNumber));
-                item->setChanged(displayNumber, false);
+            if (drawEveryLine || item->isChanged()) {
+                serlogF4(SER_TCMENU_DEBUG, "draw item (pos,id,chg)", i, item->getId(), item->isChanged());
+                item->setChanged(false);
                 taskManager.yieldForMicros(0);
                 if(itemCfg->getPosition().getGridSize() > 1) {
                     int colWidth = int(width) / itemCfg->getPosition().getGridSize();
                     int colOffset = colWidth * (itemCfg->getPosition().getGridPosition() - 1);
-                    drawMenuItem(itemCfg, Coord(colOffset, int(ypos)), Coord(colWidth - 1, int(itemCfg->getHeight())),
-                                 DrawingFlags(drawEveryLine, item == activeItem, item == menuMgr.getCurrentEditor()));
+                    drawMenuItem(itemCfg, Coord(colOffset, int(ypos)), Coord(colWidth - 1, int(itemCfg->getHeight())), drawEveryLine);
                 }
                 else {
-                    drawMenuItem(itemCfg, Coord(0, ypos), Coord(int(width), int(itemCfg->getHeight())), DrawingFlags(drawEveryLine, item == activeItem, item == menuMgr.getCurrentEditor()));
+                    drawMenuItem(itemCfg, Coord(0, ypos), Coord(int(width), int(itemCfg->getHeight())), drawEveryLine);
                 }
                 if(itemCfg->getPosition().getDrawingMode() == GridPosition::DRAW_TITLE_ITEM && itemCfg->getPosition().getRow() == 0) {
                     didDrawTitle = true;
@@ -243,6 +220,8 @@ void BaseGraphicalRenderer::renderList() {
     int totalTitleHeight = titleHeight + titleProps->getSpaceAfter();
     int totalRowHeight = rowHeight + itemProps->getSpaceAfter();
 
+    runList->setActive(true);
+
     uint8_t maxOnScreen = ((height + (rowHeight - 1)) - totalTitleHeight) / totalRowHeight;
     uint8_t currentActive = runList->getActiveIndex();
 
@@ -252,14 +231,14 @@ void BaseGraphicalRenderer::renderList() {
     cachedEntryItem = GridPositionRowCacheEntry(runList->asBackMenu(), GridPosition(GridPosition::DRAW_TITLE_ITEM,
                                                                              titleProps->getDefaultJustification(),
                                                                              0, titleHeight), titleProps);
-    drawMenuItem(&cachedEntryItem, Coord(0, 0), Coord((int)width, titleHeight), DrawingFlags(true, currentActive == 0, false));
+    drawMenuItem(&cachedEntryItem, Coord(0, 0), Coord((int)width, titleHeight), true);
 
     for (int i = 0; i <= maxOnScreen; i++) {
         uint8_t current = offset + i;
         if(current >= runList->getNumberOfRows()) break;
         RuntimeMenuItem* toDraw = runList->getChildItem(current);
         cachedEntryItem = GridPositionRowCacheEntry(toDraw, GridPosition(GridPosition::DRAW_TEXTUAL_ITEM, GridPosition::JUSTIFY_TITLE_LEFT_VALUE_RIGHT, current + 1, rowHeight), itemProps);
-        drawMenuItem(&cachedEntryItem, Coord(0, totalTitleHeight), Coord((int)width, rowHeight), DrawingFlags(true, (currentActive-1) == i, false));
+        drawMenuItem(&cachedEntryItem, Coord(0, totalTitleHeight), Coord((int)width, rowHeight), true);
         taskManager.yieldForMicros(0);
         totalTitleHeight += totalRowHeight;
     }
@@ -268,7 +247,7 @@ void BaseGraphicalRenderer::renderList() {
 
     // reset the list item to a normal list again.
     runList->asParent();
-    runList->setChanged(displayNumber, false);
+    runList->setChanged(false);
     setTitleOnDisplay(true);
 }
 
@@ -284,19 +263,21 @@ GridPosition::GridDrawingMode modeFromItem(MenuItem* item, bool useSlider) {
     }
 }
 
-void BaseGraphicalRenderer::rootHasChanged(MenuItem* rootItem) {
-    currentRootMenu = rootItem;
-    redrawMode = MENUDRAW_COMPLETE_REDRAW;
+void BaseGraphicalRenderer::checkIfRootHasChanged() {
+    auto* rootItem = menuMgr.getCurrentMenu();
+    if(currentRootMenu != rootItem)
+    {
+        serlogF(SER_TCMENU_INFO, "root has changed");
+        currentRootMenu = rootItem;
+        redrawMode = MENUDRAW_COMPLETE_REDRAW;
+        recalculateDisplayOrder(rootItem, false);
 
-    // force a complete recalculation of the grid.
-    recalculateDisplayOrder(rootItem, false);
-    setActiveItem(activeItem);
-
-    // if there is an encoder, we must update it if the values don't match because of hidden items
-    auto expectedCount = itemOrderByRow.count() - 1; // encoder is zero based so always one less.
-    if(switches.getEncoder() && expectedCount != switches.getEncoder()->getMaximumValue()) {
-        serlogF3(SER_TCMENU_INFO, "Force encoder size: ", switches.getEncoder()->getMaximumValue(), expectedCount)
-        menuMgr.setItemsInCurrentMenu(expectedCount, switches.getEncoder()->getCurrentReading());
+        // if there is an encoder, we must update it if the values don't match because of hidden items
+        auto expectedCount = itemOrderByRow.count() - 1; // encoder is zero based so always one less.
+        if(switches.getEncoder() && expectedCount != switches.getEncoder()->getMaximumValue()) {
+            serlogF3(SER_TCMENU_INFO, "Force encoder size: ", switches.getEncoder()->getMaximumValue(), expectedCount)
+            menuMgr.setItemsInCurrentMenu(expectedCount, switches.getEncoder()->getCurrentReading());
+        }
     }
 }
 
@@ -366,19 +347,8 @@ bool BaseGraphicalRenderer::areRowsOutOfOrder() {
 }
 
 void BaseGraphicalRenderer::redrawAllWidgets(bool forceRedraw) {
-    bool cardLayoutOn = isCardLayoutActive(menuMgr.getCurrentMenu());
-
-    // if there's nothing at all to draw, get out of here.
-    if(itemOrderByRow.count() == 0) return;
-
-    // if there is a title menu item, but it is not presently on the display (IE we've scrolled down)
-    // then we don't present any title items. NOTE this does not apply to card layout which always shows widgets.
-    if(itemOrderByRow.itemAtIndex(0)->getPosition().getDrawingMode() == GridPosition::DRAW_TITLE_ITEM) {
-        if(titleMode != TITLE_ALWAYS && drawingLocation.getCurrentOffset() != 0 && !cardLayoutOn) return;
-    }
-
-    // for card layout, we always redraw all widgets to ensure they are present.
-    if(cardLayoutOn) forceRedraw = true;
+    if(!isTitleOnDisplay() || itemOrderByRow.count() == 0) return;
+    if(itemOrderByRow.itemAtIndex(0)->getPosition().getDrawingMode() != GridPosition::DRAW_TITLE_ITEM) return;
 
     auto* displayProps = itemOrderByRow.itemAtIndex(0)->getDisplayProperties();
     auto widFg = displayProps->getColor(ItemDisplayProperties::HIGHLIGHT1);
@@ -424,6 +394,7 @@ int BaseGraphicalRenderer::calculateHeightTo(int index, MenuItem *pItem) {
 }
 
 uint8_t BaseGraphicalRenderer::itemCount(MenuItem*, bool ) {
+    checkIfRootHasChanged();
     if(currentRootMenu && currentRootMenu->getMenuType() == MENUTYPE_RUNTIME_LIST) {
         auto* listItem = reinterpret_cast<ListRuntimeMenuItem*>(currentRootMenu);
         return listItem->getNumberOfRows() + 1; // accounts for title.
@@ -434,6 +405,7 @@ uint8_t BaseGraphicalRenderer::itemCount(MenuItem*, bool ) {
 }
 
 int BaseGraphicalRenderer::findItemIndex(MenuItem *root, MenuItem *toFind) {
+    checkIfRootHasChanged();
     for(bsize_t i=0;i<itemOrderByRow.count();i++) {
         auto* possibleActive = itemOrderByRow.itemAtIndex(i);
         if(possibleActive->getMenuItem() == toFind) return i;
@@ -441,7 +413,21 @@ int BaseGraphicalRenderer::findItemIndex(MenuItem *root, MenuItem *toFind) {
     return 0;
 }
 
+int BaseGraphicalRenderer::findActiveItem(MenuItem* root) {
+    checkIfRootHasChanged();
+    if(currentRootMenu && currentRootMenu->getMenuType() == MENUTYPE_RUNTIME_LIST) {
+        auto* listItem = reinterpret_cast<ListRuntimeMenuItem*>(currentRootMenu);
+        return listItem->getActiveIndex(); // accounts for title.
+    }
+    for(bsize_t i=0;i<itemOrderByRow.count();i++) {
+        auto* possibleActive = itemOrderByRow.itemAtIndex(i);
+        if(possibleActive->getMenuItem()->isActive()) return possibleActive->getPosition().getRow();
+    }
+    return 0; // default to the title (back menu item)
+}
+
 MenuItem *BaseGraphicalRenderer::getMenuItemAtIndex(MenuItem* item, uint8_t idx) {
+    checkIfRootHasChanged();
     if(currentRootMenu && currentRootMenu->getMenuType() == MENUTYPE_RUNTIME_LIST) {
         return currentRootMenu;
     }
@@ -477,29 +463,6 @@ void BaseGraphicalRenderer::setTitleMode(BaseGraphicalRenderer::TitleMode mode) 
     menuMgr.changeMenu(menuMgr.getCurrentMenu());
 }
 
-BaseGraphicalRenderer::BaseGraphicalRenderer(int bufferSize, int wid, int hei, bool lastRowExact,const char *appTitle)
-        : BaseMenuRenderer(bufferSize, RENDER_TYPE_CONFIGURABLE), navigationListener(this) {
-    width = wid;
-    height = hei;
-    flags = 0;
-    setTitleOnDisplay(true);
-    setLastRowExactFit(lastRowExact);
-    setUseSliderForAnalog(true);
-    setEditStatusIconsEnabled(true);
-    currentRootMenu = nullptr;
-    pgmTitle = appTitle;
-}
-
-void BaseGraphicalRenderer::initialise() {
-    BaseMenuRenderer::initialise();
-    menuMgr.getNavigationStore().addNavigationListener(&navigationListener);
-}
-
-void BaseGraphicalRenderer::displayPropertiesHaveChanged() {
-    rootHasChanged(menuMgr.getCurrentMenu());
-    redrawMode = MENUDRAW_COMPLETE_REDRAW;
-}
-
 void preparePropertiesFromConfig(ConfigurableItemDisplayPropertiesFactory& factory, const ColorGfxMenuConfig<const void*>* gfxConfig, int titleHeight, int itemHeight) {
     // TEXT, BACKGROUND, HIGHLIGHT1, HIGHLIGHT2, SELECTED_FG, SELECTED_BG
     color_t paletteItems[] { gfxConfig->fgItemColor, gfxConfig->bgItemColor, gfxConfig->bgSelectColor, gfxConfig->fgSelectColor};
@@ -514,17 +477,6 @@ void preparePropertiesFromConfig(ConfigurableItemDisplayPropertiesFactory& facto
     factory.addImageToCache(DrawableIcon(SPECIAL_ID_ACTIVE_ICON, Coord(gfxConfig->editIconWidth, gfxConfig->editIconHeight), DrawableIcon::ICON_XBITMAP, gfxConfig->activeIcon));
 
     ConfigurableItemDisplayPropertiesFactory::refreshCache();
-}
-
-void RenderingNavigationListener::navigationHasChanged(MenuItem *newItem, bool completelyReset) {
-    if(renderer->getCurrentRendererRoot() != newItem) {
-        serlogF(SER_TCMENU_INFO, "Rendering root needs to change");
-        renderer->rootHasChanged(newItem);
-    }
-}
-
-RenderingNavigationListener::RenderingNavigationListener(BaseGraphicalRenderer *r) {
-    renderer = r;
 }
 
 } // namespace tcgfx

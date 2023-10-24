@@ -16,19 +16,18 @@ CardLayoutPane::CardLayoutPane(const DrawableIcon *left, const DrawableIcon *rig
 }
 
 bool CardLayoutPane::isSubMenuCardLayout(MenuItem *item) {
-    if(item == nullptr) return false; // it is an unmanaged menu, so cannot be card layout.
-    SubMenuUsingCardLayout* sc = usingCardLayout.getByKey(item->getId());
+    menuid_t itemId = item != nullptr ? item->getId() : 0;
+    SubMenuUsingCardLayout* sc = usingCardLayout.getByKey(itemId);
     return (sc && sc->getState());
 }
 
 void CardLayoutPane::setEnablementForSub(MenuItem *item, bool onOrOff) {
-    if(item == nullptr) return;
-
-    SubMenuUsingCardLayout* existing = usingCardLayout.getByKey(item->getId());
+    menuid_t itemId = item != nullptr ? item->getId() : 0;
+    SubMenuUsingCardLayout* existing = usingCardLayout.getByKey(itemId);
     if(existing != nullptr) {
         existing->setState(onOrOff);
     } else {
-        usingCardLayout.add(SubMenuUsingCardLayout(item->getId(), onOrOff));
+        usingCardLayout.add(SubMenuUsingCardLayout(itemId, onOrOff));
     }
 }
 

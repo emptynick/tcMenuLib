@@ -261,8 +261,8 @@ class NoRenderer : public MenuRenderer {
 private:
     BaseDialog* dialog;
 public:
-    NoRenderer() : MenuRenderer(RENDER_TYPE_NOLOCAL, 20) { MenuRenderer::theInstance = this; dialog = nullptr;}
-    ~NoRenderer() override = default;
+    NoRenderer() : MenuRenderer(RENDER_TYPE_NOLOCAL, 20) { MenuRenderer::theInstance = this; dialog = NULL;}
+    ~NoRenderer() override { }
 	bool tryTakeSelectIfNeeded(int, RenderPressMode) override { return false; }
 	void initialise() override { }
     BaseDialog* getDialog() override;
@@ -285,23 +285,22 @@ public:
 protected:
 	uint8_t lastOffset;
 	uint8_t updatesPerSecond;
-    uint8_t displayNumber = 0;
-    MenuRedrawState redrawMode;
 	uint16_t ticksToReset;
     uint16_t resetValInTicks;
+	MenuRedrawState redrawMode;
 	TitleWidget* firstWidget;
     CustomDrawing *customDrawing;
+	DisplayTakeoverMode displayTakenMode;
     BaseDialog* dialog;
-    DisplayTakeoverMode displayTakenMode;
+
 	RenderPressMode renderFnPressType;
 	RendererCallbackFn renderCallback;
-    MenuItem* activeItem = nullptr;
 public:
 	/**
 	 * constructs the renderer with a given buffer size 
 	 * @param bufferSize size of text buffer to create
 	 */
-	BaseMenuRenderer(int bufferSize, RendererType rType = RENDER_TYPE_BASE, uint8_t displayNum = 0);
+	BaseMenuRenderer(int bufferSize, RendererType rType = RENDER_TYPE_BASE);
 	
 	/** 
 	 * Destructs the class removing the allocated buffer
@@ -402,6 +401,13 @@ public:
     virtual MenuItem *getMenuItemAtIndex(MenuItem *pItem, uint8_t idx);
 
     /**
+     * Find the active item offset in the list
+     * @param root the root item
+     * @return the position 0 based.
+     */
+    virtual int findActiveItem(MenuItem* root);
+
+    /**
      * Find an item's offset in a given root, safely returns 0.
      * @param root the root item
      * @param toFind the item within that root
@@ -416,24 +422,6 @@ public:
      * @return the count
      */
     virtual uint8_t itemCount(MenuItem* item, bool includeNonVisible);
-
-    /**
-     * Set the active index to a new menu item, the active item is the one that is selected for editing and
-     * other display purposes. You must never pass null to this method, and you are returned the index in the array
-     * that is now selected.
-     * @return the active item index.
-     */
-     virtual uint8_t setActiveItem(MenuItem* item);
-
-     MenuItem* getActiveItem() { return activeItem; }
-
-    /**
-     * Find the active item offset in the list
-     * @param root the root item
-     * @return the position 0 based.
-     */
-    int findActiveItem(MenuItem* root);
-
 
     /**
 	 * For menu systems that support title widgets, this will allow the first widget.
@@ -480,8 +468,6 @@ public:
      * Completely invalidate all drawing and instigate a complete redraw of all elements.
      */
     void invalidateAll() { redrawMode = MENUDRAW_COMPLETE_REDRAW; }
-
-    static BaseMenuRenderer* getInstance() { return reinterpret_cast<BaseMenuRenderer *>(theInstance); }
 
 protected:
 	/**

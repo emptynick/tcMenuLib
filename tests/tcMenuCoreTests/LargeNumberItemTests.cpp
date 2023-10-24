@@ -199,7 +199,6 @@ test(testPersistLargeInteger) {
 	EditableLargeNumberMenuItem editable(largeNumTestCb, 101, 12, 5);
 	editable.getLargeNumber()->setValue(10029, 20349, false);
 	MockEepromAbstraction mockRom;
-    menuMgr.getNavigationStore().clearNavigationListeners();
 	menuMgr.setRootMenu(&editable);
 	menuMgr.save(mockRom);
 	dumpBuffer(editable.getLargeNumber());
@@ -217,7 +216,6 @@ test(testPersistLargeInteger) {
 	assertFalse(editable.getLargeNumber()->isNegative());
 
 	menuMgr.setRootMenu(NULL);
-    menuMgr.getNavigationStore().clearNavigationListeners();
 }
 
 test(testSetLargeIntFromString) {
@@ -296,6 +294,7 @@ test(LargeNumWithNegativeNotAllowed) {
     assertTrue(checkEditorHints(5, 6, CurrentEditorRenderingHints::EDITOR_RUNTIME_TEXT));
     assertEquals(0, editable.nextPart());
 
+    assertFalse(editable.isEditing());
     editable.copyValue(sz, sizeof(sz));
     assertStringEquals("15265", sz);
 }

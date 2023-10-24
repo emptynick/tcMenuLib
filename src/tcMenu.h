@@ -69,7 +69,7 @@ class CommitCallbackObserver : public MenuManagerObserver {
 private:
     MenuCallbackFn commitCb;
 public:
-    explicit CommitCallbackObserver(MenuCallbackFn callbackFn) {
+    CommitCallbackObserver(MenuCallbackFn callbackFn) {
         commitCb = callbackFn;
     }
 
@@ -149,7 +149,6 @@ private:
     BtreeList<menuid_t, EncoderWrapOverride> encoderWrapOverrides;
     CurrentEditorRenderingHints renderingHints;
 public:
-    static SubMenuItem ROOT;
 	MenuManager();
 
     /**
@@ -218,15 +217,6 @@ public:
      */
     void initFor4WayJoystick(MenuRenderer* renderer, MenuItem* root, pinid_t downPin, pinid_t upPin, pinid_t leftPin,
                              pinid_t rightPin, pinid_t okPin, int speed=20);
-
-    /**
-     * Initialise for up a 2 button joystick where the up doubles as back, and the down doubles as OK when held.
-     * @param renderer the renderer used for drawing
-     * @param root the first menu item
-     * @param upPin the button on up
-     * @param downPin the button for down
-     */
-    void initForTwoButton(MenuRenderer* renderer, MenuItem* root, pinid_t upPin, pinid_t downPin);
 
     /**
 	 * Initialise in situations where local input is not needed or where a custom type of input is needed
@@ -360,9 +350,17 @@ public:
 	MenuItem* findCurrentActive();
 
 	/**
+	 * Activates the menu item provided if it is within the current menu, this actually does
+	 * more than set active, it does the equivalent of an encoder button press.
+	 * @param item the item to activate
+	 * @return if the item was activated
+	 */
+	bool activateMenuItem(MenuItem* item);
+
+	/**
 	 * Get the root of all menus, the first menu item basically
 	 */
-	MenuItem* getRoot() { return ROOT.getChild(); }
+	MenuItem* getRoot() { return navigator.getRoot(); }
 
     /**
      * Get the renderer that this menu is using
@@ -516,8 +514,6 @@ protected:
 
     void notifyEditEnd(MenuItem *pItem);
     bool notifyEditStarting(MenuItem *pItem);
-
-    void setRootItem(MenuItem *pItem);
 };
 
 inline bool editorHintNeedsCursor(CurrentEditorRenderingHints::EditorRenderingType ty) {
@@ -529,4 +525,4 @@ inline bool editorHintNeedsCursor(CurrentEditorRenderingHints::EditorRenderingTy
  */
 extern MenuManager menuMgr;
 
-#endif // TCMENU_MANAGER_H
+#endif // defined header file

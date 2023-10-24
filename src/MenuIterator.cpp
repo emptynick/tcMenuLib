@@ -186,6 +186,12 @@ bool MenuItemTypePredicate::matches(MenuItem* item) {
         return item->getMenuType() == filterType;
 }
 
+MenuItem* getItemAtPosition(MenuItem* root, uint8_t pos) {
+    if(MenuRenderer::getInstance() && MenuRenderer::getInstance()->getRendererType() == RENDER_TYPE_NOLOCAL) return root;
+    auto *confRenderer = reinterpret_cast<BaseMenuRenderer *>(MenuRenderer::getInstance());
+    return confRenderer->getMenuItemAtIndex(root, pos);
+}
+
 int offsetOfItem(MenuItem* itemToFind) {
     if(MenuRenderer::getInstance() && MenuRenderer::getInstance()->getRendererType() == RENDER_TYPE_NOLOCAL) return 0;
     auto *confRenderer = reinterpret_cast<BaseMenuRenderer*>(MenuRenderer::getInstance());
@@ -217,6 +223,6 @@ MenuItem* getSubRecurse(MenuItem* toSearch, MenuItem* subMenu, MenuItem* current
 }
 
 MenuItem* getSubMenuFor(MenuItem* current) {
-    if(current == nullptr) return nullptr; // we cannot traverse: null -> null
-    return getSubRecurse(&MenuManager::ROOT, nullptr, current);
+    if(current == nullptr) return nullptr;
+    return getSubRecurse(menuMgr.getRoot(), nullptr, current);
 }

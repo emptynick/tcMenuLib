@@ -9,14 +9,10 @@
 #include "ScrollChoiceMenuItem.h"
 #include "MenuIterator.h"
 #include "SecuredMenuPopup.h"
-#include "extras/TwoButtonSwitchEncoder.h"
 #include <IoAbstraction.h>
 #include <BaseDialog.h>
 
 MenuManager menuMgr;
-
-const SubMenuInfo TCGLB_ROOT_SUB_INFO PROGMEM = { "ROOT", 0, (uint16_t)-1, 1, nullptr };
-SubMenuItem MenuManager::ROOT(&TCGLB_ROOT_SUB_INFO, nullptr);
 
 class Digital4WayPassThruListener : public SwitchListener {
 private:
@@ -50,7 +46,7 @@ public:
 void MenuManager::initFor4WayJoystick(MenuRenderer* renderer, MenuItem* root, pinid_t downPin, pinid_t upPin, pinid_t leftPin,
                          pinid_t rightPin, pinid_t okPin, int speed) {
     this->renderer = renderer;
-    setRootItem(root);
+    navigator.setRootItem(root);
     fourWayPassThru.init(leftPin, rightPin);
 
     if(okPin == 0xffU) {
@@ -63,16 +59,9 @@ void MenuManager::initFor4WayJoystick(MenuRenderer* renderer, MenuItem* root, pi
     renderer->initialise();
 }
 
-void MenuManager::initForTwoButton(MenuRenderer *r, MenuItem *root, pinid_t upPin, pinid_t downPin) {
-    this->renderer = r;
-    setRootItem(root);
-    switches.setEncoder(new TwoButtonSwitchEncoder(upPin, downPin, [](int v) { menuMgr.valueChanged(v); }));
-    renderer->initialise();
-}
-
 void MenuManager::initForUpDownOk(MenuRenderer* renderer, MenuItem* root, pinid_t pinDown, pinid_t pinUp, pinid_t pinOk, int speed) {
     this->renderer = renderer;
-    setRootItem(root);
+    navigator.setRootItem(root);
 
     switches.addSwitch(pinOk, nullptr);
     switches.onRelease(pinOk, [](pinid_t /*key*/, bool held) { menuMgr.onMenuSelect(held); });
@@ -82,7 +71,7 @@ void MenuManager::initForUpDownOk(MenuRenderer* renderer, MenuItem* root, pinid_
 
 void MenuManager::initForEncoder(MenuRenderer* renderer,  MenuItem* root, pinid_t encoderPinA, pinid_t encoderPinB, pinid_t encoderButton, EncoderType type) {
 	this->renderer = renderer;
-    setRootItem(root);
+    navigator.setRootItem(root);
 
 	switches.addSwitch(encoderButton, nullptr);
     switches.onRelease(encoderButton, [](pinid_t /*key*/, bool held) { menuMgr.onMenuSelect(held); });
@@ -133,7 +122,7 @@ void MenuManager::performDirectionMove(bool dirIsBack) {
 
 void MenuManager::initWithoutInput(MenuRenderer* renderer, MenuItem* root) {
 	this->renderer = renderer;
-    setRootItem(root);
+    navigator.setRootItem(root);
 	renderer->initialise();
 }
 
@@ -170,13 +159,16 @@ void MenuManager::valueChanged(int value) {
 
 void MenuManager::setItemActive(MenuItem* item) {
     if(item) {
-        // change the encoder value if there is an encoder present
-        if(renderer->getRendererType() == RENDER_TYPE_NOLOCAL || switches.getEncoder() == nullptr) return;
-        auto baseRenderer = reinterpret_cast<BaseMenuRenderer*>(renderer);
+        auto oldActive = findCurrentActive();
+        if(oldActive) oldActive->setActive(false);
+        item->setActive(true);
 
-        auto activeIdx = baseRenderer->setActiveItem(item);
-        if(activeIdx <= switches.getEncoder()->getMaximumValue()) {
-            switches.getEncoder()->setCurrentReading(activeIdx);
+        // change the encoder value if there is an encoder present
+        if(renderer->getRendererType() != RENDER_TYPE_NOLOCAL && switches.getEncoder() != nullptr) {
+            int activeIdx = reinterpret_cast<BaseMenuRenderer*>(renderer)->findItemIndex(getCurrentMenu(), item);
+            if(activeIdx >= 0 && activeIdx <= switches.getEncoder()->getMaximumValue()) {
+                switches.getEncoder()->setCurrentReading(activeIdx);
+            }
         }
 
         // and notify that we have just changed the value.
@@ -255,6 +247,7 @@ void MenuManager::actionOnCurrentItem(MenuItem* toEdit) {
 	}
 	else if (toEdit->getMenuType() == MENUTYPE_BACK_VALUE) {
 	    toEdit->triggerCallback();
+		toEdit->setActive(false);
 		resetMenu(false);
 	}
 	else if (isItemActionable(toEdit)) {
@@ -282,6 +275,8 @@ void MenuManager::stopEditingCurrentItem(bool doMultiPartNext) {
 		}
 	}
 
+	currentEditor->setEditing(false);
+
     notifyEditEnd(currentEditor);
 	
     currentEditor = nullptr;
@@ -300,9 +295,56 @@ MenuItem* MenuManager::getParentAndReset() {
         if(sub) return reinterpret_cast<SubMenuItem*>(sub)->getChild();
     }
 
-	auto* pItem = getParentRoot(menuMgr.getCurrentMenu());
+    if(menuMgr.getRenderer()->getRendererType() == RENDER_TYPE_CONFIGURABLE && navigator.isShowingRoot()) {
+        auto* titleItem = reinterpret_cast<BaseMenuRenderer*>(menuMgr.getRenderer())->getMenuItemAtIndex(getCurrentMenu(), 0);
+        if(titleItem) titleItem->setActive(false);
+    }
+
+	auto* pItem = getParentRootAndVisit(menuMgr.getCurrentMenu(), [](MenuItem* curr) {
+		curr->setActive(false);
+		curr->setEditing(false);
+	});
+
 	if(pItem == nullptr) pItem = menuMgr.getRoot();
 	return pItem;
+}
+
+bool MenuManager::activateMenuItem(MenuItem *item) {
+    if(renderer->getRendererType() == RENDER_TYPE_NOLOCAL) return false;
+    auto* r = reinterpret_cast<BaseMenuRenderer*>(renderer);
+    uint8_t count = r->itemCount(getCurrentMenu(), false);
+    for(int i=0; i < count; i++) {
+        auto* pItem = r->getMenuItemAtIndex(getCurrentMenu(), i);
+        if(pItem != nullptr && pItem->getId() == item->getId()) {
+            if(switches.getEncoder()) {
+                switches.getEncoder()->setCurrentReading(i);
+            }
+            valueChanged(i);
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Finds teh currently active menu item with the selected SubMenuItem
+ */
+MenuItem* MenuManager::findCurrentActive() {
+	MenuItem* itm = navigator.getCurrentRoot();
+	while (itm != nullptr) {
+		if (itm->isActive()) {
+			return itm;
+		}
+		itm = itm->getNext();
+	}
+
+	// there's a special case for the title menu on the main page that needs to be checked against.
+	if(renderer->getRendererType() == RENDER_TYPE_CONFIGURABLE) {
+	    auto* pItem = reinterpret_cast<BaseMenuRenderer*>(renderer)->getMenuItemAtIndex(getCurrentMenu(), 0);
+	    if(pItem && pItem->isActive()) return pItem;
+	}
+
+	return getCurrentMenu();
 }
 
 void MenuManager::setupForEditing(MenuItem* item) {
@@ -342,12 +384,13 @@ void MenuManager::setupForEditing(MenuItem* item) {
 
 void MenuManager::setCurrentEditor(MenuItem * editor) {
 	if (currentEditor != nullptr) {
-		currentEditor->setChanged(true);
+		currentEditor->setEditing(false);
+		currentEditor->setActive(editor == nullptr);
 	}
 	currentEditor = editor;
 
     if(currentEditor != nullptr) {
-        currentEditor->setChanged(true);
+        currentEditor->setEditing(true);
     }
 
     renderingHints.changeEditingParams(CurrentEditorRenderingHints::EDITOR_REGULAR, 0, 0);
@@ -478,7 +521,7 @@ void MenuManager::resetMenu(bool completeReset) {
 
     MenuItem* currentActive;
     if(completeReset) {
-        setRootItem(navigator.getRoot());
+        navigator.setRootItem(navigator.getRoot());
         currentActive = nullptr;
     } else {
         currentActive = navigator.popNavigationGetActive();
@@ -521,18 +564,6 @@ void MenuManager::setEditorHints(CurrentEditorRenderingHints::EditorRenderingTyp
 void MenuManager::setEditorHintsLocked(bool locked) {
     renderingHints.lockEditor(locked);
     serlogF2(SER_TCMENU_DEBUG, "EditorHints Locked = ", locked);
-}
-
-MenuItem *MenuManager::findCurrentActive() {
-    if(renderer->getRendererType() == RENDER_TYPE_NOLOCAL) return getRoot();
-    auto bmr = reinterpret_cast<BaseMenuRenderer*>(renderer);
-    auto idx = bmr->findActiveItem(getCurrentMenu());
-    return bmr->getMenuItemAtIndex(getCurrentMenu(), idx);
-}
-
-void MenuManager::setRootItem(MenuItem *pItem) {
-    ROOT.setChild(pItem);
-    navigator.setRootItem(pItem);
 }
 
 void CurrentEditorRenderingHints::changeEditingParams(CurrentEditorRenderingHints::EditorRenderingType ty, int startOffset, int endOffset) {

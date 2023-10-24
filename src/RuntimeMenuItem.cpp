@@ -35,7 +35,7 @@ RuntimeMenuItem::RuntimeMenuItem(const AnyMenuInfo* rtInfo, bool isPgm, MenuType
 int defaultRtListCallback(RuntimeMenuItem* item, uint8_t row, RenderFnMode mode, char* buffer, int bufferSize) {
     switch(mode) {
         case RENDERFN_INVOKE:
-            // we must never call the invoke function on MenuItem from here
+            item->runCallback();
             return true;
         case RENDERFN_NAME:
             if(row != LIST_PARENT_ITEM_POS) {
@@ -89,8 +89,9 @@ RuntimeMenuItem *ListRuntimeMenuItem::getChildItem(int pos) {
     menuType = MENUTYPE_RUNTIME_LIST;
     itemPosition = pos;
     if((activeItem - 1) == pos) {
+        setActive(true);
         renderFn(this, activeItem, RENDERFN_ACTIVATE, nullptr, 0);
-    }
+    } else setActive(false);
     return this;
 }
 
@@ -101,11 +102,13 @@ RuntimeMenuItem *ListRuntimeMenuItem::asParent() {
 }
 
 RuntimeMenuItem *ListRuntimeMenuItem::asBackMenu() {
+    if(activeItem == 0) {
+        // the title is active.
+        setActive(true);
+        renderFn(this, 0, RENDERFN_ACTIVATE, nullptr, 0);
+    } else setActive(false);
     menuType = MENUTYPE_BACK_VALUE;
     itemPosition = LIST_PARENT_ITEM_POS;
-    if(activeItem == 0) {
-        runCallback();
-    }
     return this;
 }
 
@@ -565,6 +568,7 @@ void DateFormattedMenuItem::setDateFromString(const char *dateText) {
 }
 
 uint8_t EditableMultiPartMenuItem::beginMultiEdit() {
+    setEditing(true);
     itemPosition = 0;
     return noOfParts;
 }
@@ -595,6 +599,7 @@ int EditableMultiPartMenuItem::nextPart() {
 
 void EditableMultiPartMenuItem::stopMultiEdit() {
     itemPosition = 0xff;
+    setEditing(false);
     setChanged(true);
     setSendRemoteNeededAll();
     runCallback();

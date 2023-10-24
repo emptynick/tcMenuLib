@@ -189,6 +189,7 @@ test(addingItemsAndMenuCallbacks) {
     menuMgrObserver.setStartReturn(true);
     auto currentMenuValue = boolItem1.getBoolean();
     menuMgr.valueChanged(2); // boolItem1
+    assertTrue(boolItem1.isActive());
     menuMgr.onMenuSelect(false);
 
     assertTrue(menuMgrObserver.didTriggerEndEdit());
@@ -210,7 +211,7 @@ test(addingItemsAndMenuCallbacks) {
     menuMgr.valueChanged(3); //  select menuEnum1
     menuMgr.onMenuSelect(false); // start edit
     assertTrue(menuMgrObserver.didTriggerStartEdit());
-    assertTrue(&menuEnum1 == menuMgr.getCurrentEditor());
+    assertTrue(menuEnum1.isEditing());
 
     menuMgr.valueChanged(1); // we are now editing, change the actual enum
     menuMgr.onMenuSelect(false); // stop editing
@@ -224,6 +225,6 @@ test(addingItemsAndMenuCallbacks) {
     menuMgr.valueChanged(3); // menuEnum1
     menuMgr.onMenuSelect(false);
     assertTrue(menuMgrObserver.didTriggerStartEdit());
-    assertTrue(&menuEnum1 == menuMgr.getCurrentEditor());
+    assertFalse(menuEnum1.isEditing());
 }
 

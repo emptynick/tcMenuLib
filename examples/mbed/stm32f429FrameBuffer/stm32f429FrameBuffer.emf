@@ -160,22 +160,6 @@
       }
     },
     {
-      "parentId": 5,
-      "type": "runtimeList",
-      "item": {
-        "initialRows": 5,
-        "listCreationMode": "FLASH_ARRAY",
-        "name": "Board List",
-        "variableName": "SettingsBoardList",
-        "id": 26,
-        "eepromAddress": -1,
-        "readOnly": false,
-        "localOnly": false,
-        "visible": true,
-        "staticDataInRAM": false
-      }
-    },
-    {
       "parentId": 0,
       "type": "subMenu",
       "item": {
@@ -538,16 +522,5 @@
     "packageNamespace": "",
     "appIsModular": false
   },
-  "stringLists": [
-    {
-      "id": 26,
-      "listItems": [
-        "STM32",
-        "ESP32",
-        "AVR",
-        "SAMD",
-        "RP2040"
-      ]
-    }
-  ]
+  "stringLists": []
 }

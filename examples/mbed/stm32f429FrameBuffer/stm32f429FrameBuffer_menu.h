@@ -57,8 +57,6 @@ extern SubMenuItem menuSamples;
 extern BooleanMenuItem menuConnectivityEnableUSB;
 extern BackMenuItem menuBackConnectivity;
 extern SubMenuItem menuConnectivity;
-extern const char* const enumStrSettingsBoardList[];
-extern ListRuntimeMenuItem menuSettingsBoardList;
 extern AnyMenuInfo minfoSettingsDashboard;
 extern ActionMenuItem menuSettingsDashboard;
 extern ActionMenuItem menuSettingsCalibrateNow;

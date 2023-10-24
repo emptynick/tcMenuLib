@@ -384,7 +384,7 @@
       },
       {
         "name": "TITLE_SHOW_MODE",
-        "latestValue": "NO_TITLE",
+        "latestValue": "TITLE_FIRST_ROW",
         "subsystem": "THEME"
       },
       {

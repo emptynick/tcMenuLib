@@ -66,23 +66,22 @@ void MenuTouchScreenEncoder::touched(const TouchNotification &evt) {
             menuMgr.stopEditingCurrentItem(false);
         }
         else {
-            bool wasActive = renderer->getActiveItem() == theItem;
+            bool wasActive = theItem->isActive();
             if(!wasActive) {
                 // if it's not active try and activate, if it fails we can't continue.
-                uint8_t itemIdx = renderer->setActiveItem(theItem);
-                if(switches.getEncoder()) {
-                    switches.getEncoder()->setCurrentReading(itemIdx);
-                }
+                if (!menuMgr.activateMenuItem(theItem)) return;
             }
 
             auto menuType = theItem->getMenuType();
             auto held = evt.getTouchState() == HELD;
             bool showingTheList = menuMgr.getCurrentMenu() == theItem;
-            if(menuType == MENUTYPE_RUNTIME_LIST && showingTheList) {
+            if(theItem->getMenuType() == MENUTYPE_RUNTIME_LIST && showingTheList) {
                 auto* listItem = reinterpret_cast<ListRuntimeMenuItem*>(theItem);
                 int row = evt.getEntry()->getPosition().getRow();
                 if(row == 0) {
+                    listItem->asBackMenu();
                     menuMgr.onMenuSelect(false);
+                    listItem->asParent();
                 }
                 else {
                     listItem->setActiveIndex(row - 1);
@@ -105,7 +104,7 @@ void MenuTouchScreenEncoder::touched(const TouchNotification &evt) {
             else if(!theItem->isReadOnly()){
                 GridPosition::GridDrawingMode drawingMode = evt.getEntry()->getPosition().getDrawingMode();
                 if(drawingMode == GridPosition::DRAW_INTEGER_AS_UP_DOWN && wasActive) {
-                    if(menuMgr.getCurrentEditor() != theItem) menuMgr.onMenuSelect(false);
+                    if(!theItem->isEditing()) menuMgr.onMenuSelect(false);
                     int increment = 0;
                     auto xPos = evt.getCursorPosition().x;
                     auto buttonSize = evt.getItemSize().y;
@@ -127,7 +126,7 @@ void MenuTouchScreenEncoder::touched(const TouchNotification &evt) {
                     }
                 }
                 else if(drawingMode == GridPosition::DRAW_INTEGER_AS_SCROLL && wasActive) {
-                    if(menuMgr.getCurrentEditor() != theItem) menuMgr.onMenuSelect(false);
+                    if(!theItem->isEditing()) menuMgr.onMenuSelect(false);
                     auto* analog = reinterpret_cast<AnalogMenuItem*>(theItem);
                     float correction =  float(analog->getMaximumValue()) / float(evt.getItemSize().x);
                     float percentage = evt.getCursorPosition().x * correction;

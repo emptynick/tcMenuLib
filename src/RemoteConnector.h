@@ -495,8 +495,6 @@ private:
 	void setFullyJoinedRx(bool joinRx) { bitWrite(flags, FLAG_FULLY_JOINED_RX, joinRx);	}
 
 	void setFullyJoinedTx(bool joinTx) { bitWrite(flags, FLAG_FULLY_JOINED_TX, joinTx); }
-
-    bool beginEncodeChange(MenuItem *item);
 };
 
 #endif /* _TCMENU_REMOTECONNECTOR_H_ */
