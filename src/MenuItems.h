@@ -336,6 +336,7 @@ protected:
 	MenuType menuType;
 public:
 
+	bool isEditing = false;
     /**
      * Copies the name into the provided buffer starting at position 0.
      * @param sz the buffer space
@@ -409,12 +410,19 @@ public:
      * Marks the menu item as having updated locally and remotely and also calls the callback if not silent
      */
     void changeOccurred(bool silent);
+
+	void setAlternativeName(char* name) {
+		memcpy(alternative_name, name, constrain(strlen(name), 0, 30));
+		alternative_name_set = true;
+	}
 protected:
 	/**
 	 * Do not directly create menu items, always use the leaf classes, such as AnalogMenuItem etc.
 	 */
 	MenuItem(MenuType menuType, const AnyMenuInfo* menuInfo, MenuItem* next, bool infoProgMem);
-
+private:
+	char alternative_name[30];
+	bool alternative_name_set = false;
 };
 
 /** 

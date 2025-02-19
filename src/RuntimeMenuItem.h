@@ -102,6 +102,36 @@ public:
 		setChanged(true); 
 		setSendRemoteNeededAll(); 
 	}
+
+    uint8_t getCurrentPosition() const { return itemPosition; }
+    void setValue(char* v) {
+        if (strcmp(value, v) != 0) {
+            strcpy(value, v);
+            valueChanged = true;
+        }
+    }
+    char* getValue() {
+        return value;
+    }
+    void setTextLength(uint16_t len) {
+        textLength = len;
+    }
+    uint16_t getTextLength() {
+        return textLength;
+    }
+    bool hasChanged() {
+        return valueChanged;
+    }
+    void unchange() {
+        valueChanged = false;
+    }
+    void doChange() {
+        valueChanged = true;
+    }
+private:
+    bool valueChanged = true;
+    char value[100] = "";
+    uint16_t textLength = 0;
 };
 
 /**

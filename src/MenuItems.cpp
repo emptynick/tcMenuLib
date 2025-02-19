@@ -48,6 +48,11 @@ void MenuItem::triggerCallback() const {
 }
 
 uint8_t MenuItem::copyNameToBuffer(char* buf, int offset, int size) const {
+    if (alternative_name_set) {
+        strncpy(buf + offset, alternative_name, size - offset);
+        return 30;
+    }
+
     // If there is no info block, it has to be a runtime item, process as runtime
     if (info == nullptr) {
 		asRuntimeItem(this)->copyRuntimeName(buf + offset, size - offset);
